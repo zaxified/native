@@ -657,11 +657,11 @@ test "a streamed reply paints its visible tail beyond the paragraph page cap" {
     defer h.destroy();
 
     const long_reply =
-        ("The lantern kept watch through the night.\n" ** 150) ++
+        (strRepeat("The lantern kept watch through the night.\n", 150)) ++
         "TAIL_SENTINEL";
     const long_reply_event =
         "data: {\"choices\":[{\"delta\":{\"content\":\"" ++
-        ("The lantern kept watch through the night.\\n" ** 150) ++
+        (strRepeat("The lantern kept watch through the night.\\n", 150)) ++
         "TAIL_SENTINEL\"}}]}";
 
     try h.say("tell me a long story");
@@ -703,7 +703,7 @@ test "long visible history sends a recent suffix within the fetch body bound" {
     // Each wire pair decodes to one quote. Two individually valid SSE
     // lines build a 40 KiB visible assistant turn which needs more than
     // 80 KiB when JSON escaping puts it into the next request.
-    const escaped_quotes = "\\\"" ** (20 * 1024);
+    const escaped_quotes = strRepeat("\\\"", 20 * 1024);
     const quote_event =
         "data: {\"choices\":[{\"delta\":{\"content\":\"" ++
         escaped_quotes ++
@@ -1061,4 +1061,16 @@ test "a recorded conversation replays byte-identically with zero host calls" {
         // replayed model's.
         try std.testing.expectEqualStrings(test_model_name, Bridge.model().modelName);
     }
+}
+
+/// Comptime string repetition; replaces the `**` operator removed in Zig 0.17.
+inline fn strRepeat(comptime s: []const u8, comptime n: usize) *const [s.len * n:0]u8 {
+    const rep_result = comptime blk: {
+        @setEvalBranchQuota(n * (s.len + 4) + 1000);
+        var buf: [s.len * n:0]u8 = undefined;
+        for (0..n) |i| @memcpy(buf[i * s.len ..][0..s.len], s);
+        const rep_final = buf;
+        break :blk rep_final;
+    };
+    return &rep_result;
 }

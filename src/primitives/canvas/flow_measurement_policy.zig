@@ -51,7 +51,7 @@ pub const GridPlan = struct {
         request[0..4].* = .{ 38, 1, @import("render_plan_policy.zig").numericFlags(), @intFromBool(windowed) };
         word(request, 4, std.math.cast(u32, count) orelse @panic("grid measurement count exceeds wire range"));
         const packet = request[16..92];
-        packet[0..4].* = .{ 4, 0, @as(u8, @intFromBool(windowed)) | (surface.anchorFlags(0, false) >> 2) | @as(u8, if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) 4 else 0), 0 };
+        packet[0..4].* = .{ 4, 0, @as(u8, @intFromBool(windowed)) | (surface.anchorFlags(0, false) >> 2) | @as(u8, if (builtin.mode == .debug or builtin.mode == .safe) 4 else 0), 0 };
         for ([_]usize{ flows, columns, overscan }, 0..) |value, i| std.mem.writeInt(u64, packet[4 + i * 8 ..][0..8], value, .little);
         const values = [_]f32{ content.x, content.y, content.width, content.height, gap, item_extent, 0, scroll, @floatFromInt(flows), @floatFromInt(columns), @floatFromInt(flows -| 1), @floatFromInt(columns -| 1) };
         for (values, 0..) |value, i| put(packet, 28 + i * 4, value);

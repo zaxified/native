@@ -236,7 +236,7 @@ fn virtualView(ui: *Ui, label: []const u8, video: []const u8) !Ui.Node {
         };
         target.range = ui.virtualWindow(target.options);
         const at = 8 + index * 96;
-        inline for (@typeInfo(sdk.canvas.VirtualListRange).@"struct".fields, 0..) |field, offset| {
+        inline for (typeFields(@typeInfo(sdk.canvas.VirtualListRange).@"struct"), 0..) |field, offset| {
             const value = @field(target.range, field.name);
             const number: f64 = if (@typeInfo(field.type) == .int) @floatFromInt(value) else value;
             std.mem.writeInt(u64, context[at + offset * 8 ..][0..8], @bitCast(number), .little);
@@ -401,7 +401,7 @@ fn node(ui: *Ui, records: []const Record, index: usize, parent_end: usize, depth
     if (value.kind == .markdown) {
         if (value.markdownRecipe == null or value.end != index + 1) return error.InvalidView;
         const defaults: Record = .{ .end = value.end, .kind = .markdown, .text = "" };
-        inline for (@typeInfo(Record).@"struct".fields) |field| {
+        inline for (typeFields(@typeInfo(Record).@"struct")) |field| {
             if (comptime !std.mem.eql(u8, field.name, "end") and !std.mem.eql(u8, field.name, "kind") and !std.mem.eql(u8, field.name, "markdownRecipe") and !std.mem.eql(u8, field.name, "markdownLink") and !std.mem.eql(u8, field.name, "markdownDetails")) {
                 const provided = @field(value, field.name);
                 const expected = @field(defaults, field.name);
@@ -768,7 +768,7 @@ test "compiled image records preserve exact identities fit and independent nativ
 test "compiled app Markdown rejects unrelated fields malformed bytes and incompatible routes" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
-    var recipe = [_]u8{0} ** 80;
+    var recipe = @as([80]u8, @splat(0));
     recipe[0] = 1;
     recipe[4] = 1;
     recipe[16] = 3;
@@ -854,7 +854,7 @@ fn scrollTreePolicy(request: []const u8, output: []u8) usize {
 }
 
 fn event(ui: *Ui, bytes: []const u8) !core.Msg {
-    if (bytes.len < 2 or bytes[0] != 1 or bytes[1] >= @typeInfo(core.Msg).@"union".fields.len) return error.InvalidView;
+    if (bytes.len < 2 or bytes[0] != 1 or bytes[1] >= typeFields(@typeInfo(core.Msg).@"union").len) return error.InvalidView;
     return core.nativeViewEvent(bytes, ui.arena) orelse error.InvalidView;
 }
 
@@ -869,7 +869,7 @@ fn dragEvent(ui: *Ui, bytes: []const u8) !core.Msg {
 }
 
 fn scrollEvent(tag: u8) !Ui.ScrollMsgFn {
-    inline for (@typeInfo(core.Msg).@"union".fields, 0..) |field, index| {
+    inline for (typeFields(@typeInfo(core.Msg).@"union"), 0..) |field, index| {
         if (comptime sdk.canvas.ui_markup_reflect.declaredScrollStateRecord(field.type)) {
             if (tag == index) return Ui.translatedScrollMsg(@field(std.meta.Tag(core.Msg), field.name), field.type);
         }
@@ -878,7 +878,7 @@ fn scrollEvent(tag: u8) !Ui.ScrollMsgFn {
 }
 
 fn terminalEvent(tag: u8) !Ui.TerminalMsgFn {
-    inline for (@typeInfo(core.Msg).@"union".fields, 0..) |field, index| {
+    inline for (typeFields(@typeInfo(core.Msg).@"union"), 0..) |field, index| {
         if (comptime sdk.canvas.ui_markup_reflect.declaredTerminalStateRecord(field.type)) {
             if (tag == index) return Ui.translatedTerminalMsg(@field(std.meta.Tag(core.Msg), field.name), field.type);
         }
@@ -887,7 +887,7 @@ fn terminalEvent(tag: u8) !Ui.TerminalMsgFn {
 }
 
 fn inputEvent(tag: u8) !Ui.InputMsgFn {
-    inline for (@typeInfo(core.Msg).@"union".fields, 0..) |field, index| {
+    inline for (typeFields(@typeInfo(core.Msg).@"union"), 0..) |field, index| {
         if (comptime sdk.canvas.ui_markup_reflect.declaredTextInputUnion(field.type)) {
             if (tag == index) return Ui.translatedInputMsg(@field(std.meta.Tag(core.Msg), field.name), field.type);
         }
@@ -896,13 +896,13 @@ fn inputEvent(tag: u8) !Ui.InputMsgFn {
 }
 
 fn markdownLinkEvent(tag: u8) !Ui.LinkMsgFn {
-    inline for (@typeInfo(core.Msg).@"union".fields, 0..) |field, index| {
+    inline for (typeFields(@typeInfo(core.Msg).@"union"), 0..) |field, index| {
         if (comptime field.type == []const u8) if (tag == index) return Ui.linkMsg(@field(std.meta.Tag(core.Msg), field.name));
     }
     return error.InvalidView;
 }
 fn markdownDetailsEvent(tag: u8) !*const fn (usize) core.Msg {
-    inline for (@typeInfo(core.Msg).@"union".fields, 0..) |field, index| {
+    inline for (typeFields(@typeInfo(core.Msg).@"union"), 0..) |field, index| {
         if (comptime @typeInfo(field.type) == .int or @typeInfo(field.type) == .float) {
             if (tag == index) return struct {
                 fn make(ordinal: usize) core.Msg {
@@ -916,7 +916,7 @@ fn markdownDetailsEvent(tag: u8) !*const fn (usize) core.Msg {
 }
 
 fn valueEvent(tag: u8) !Ui.ValueMsgFn {
-    inline for (@typeInfo(core.Msg).@"union".fields, 0..) |field, index| {
+    inline for (typeFields(@typeInfo(core.Msg).@"union"), 0..) |field, index| {
         if (comptime @typeInfo(field.type) == .float) {
             if (tag == index) return Ui.translatedValueMsg(@field(std.meta.Tag(core.Msg), field.name), field.type);
         }
@@ -961,7 +961,7 @@ test "compiled sliders reject incompatible value channels" {
             "{\"format\":2,\"nodes\":[{\"end\":1,\"kind\":\"slider\",\"text\":\"\",\"valueChange\":0,\"change\":[1,0]}]}",
             "{\"format\":2,\"nodes\":[{\"end\":2,\"kind\":\"slider\",\"text\":\"\"},{\"end\":2,\"kind\":\"text\",\"text\":\"child\"}]}",
         }) |source| try std.testing.expectError(error.InvalidView, decode(&ui, source));
-        inline for (@typeInfo(core.Msg).@"union".fields, 0..) |field, tag| {
+        inline for (typeFields(@typeInfo(core.Msg).@"union"), 0..) |field, tag| {
             if (comptime @typeInfo(field.type) != .float) try std.testing.expectError(error.InvalidView, valueEvent(tag));
         }
     } else return error.SkipZigTest;
@@ -1022,7 +1022,7 @@ pub fn testContextMenuRecords() !void {
         @memset(oversized, .{ .label = "", .enabled = true, .separator = true });
         const records = [_]Record{.{ .end = 1, .kind = .list_item, .text = "", .contextMenu = oversized }};
         try std.testing.expectError(error.InvalidView, node(&ui, &records, 0, 1, 0, &.{}, null));
-        inline for (@typeInfo(core.Msg).@"union".fields, 0..) |field, tag| {
+        inline for (typeFields(@typeInfo(core.Msg).@"union"), 0..) |field, tag| {
             if (comptime field.type == void) {
                 const source = try std.fmt.allocPrint(std.testing.allocator, "{{\"format\":2,\"nodes\":[{{\"end\":1,\"kind\":\"list_item\",\"text\":\"Task\",\"contextMenu\":[{{\"label\":\"Café\",\"press\":[1,{d}],\"enabled\":false,\"separator\":false}},{{\"label\":\"\",\"enabled\":true,\"separator\":true}}]}}]}}", .{tag});
                 defer std.testing.allocator.free(source);
@@ -1073,7 +1073,7 @@ test "compiled view negative integer slot keys match native iteration identities
 
 test "compiled view message bytes belong to the native tree arena" {
     if (comptime enabled) {
-        inline for (@typeInfo(core.Msg).@"union".fields, 0..) |field, tag| {
+        inline for (typeFields(@typeInfo(core.Msg).@"union"), 0..) |field, tag| {
             if (comptime field.type == []const u8) {
                 var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
                 defer arena.deinit();
@@ -1221,7 +1221,7 @@ test "compiled code diff ordinals preserve every mask word and reject invalid tr
             "{\"format\":2,\"nodes\":[{\"end\":1,\"kind\":\"textarea\",\"text\":\"\",\"codeLanguage\":\"plain\",\"codeLineDigits\":0,\"codeAddedLines\":[1,1],\"codeRemovedLines\":[]}]}",
             "{\"format\":2,\"nodes\":[{\"end\":1,\"kind\":\"textarea\",\"text\":\"\",\"codeLanguage\":\"plain\",\"codeLineDigits\":0,\"codeAddedLines\":[128],\"codeRemovedLines\":[128]}]}",
         }) |invalid| try std.testing.expectError(error.InvalidView, decode(&ui, invalid));
-        try std.testing.expectError(error.InvalidView, codeLineMask(&([_]u8{1} ** 129)));
+        try std.testing.expectError(error.InvalidView, codeLineMask(&(@as([129]u8, @splat(1)))));
     }
 }
 
@@ -1273,7 +1273,7 @@ pub fn testModalRecords() !void {
     if (comptime enabled) {
         var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
         defer arena.deinit();
-        inline for (@typeInfo(core.Msg).@"union".fields, 0..) |field, tag| {
+        inline for (typeFields(@typeInfo(core.Msg).@"union"), 0..) |field, tag| {
             if (comptime field.type == void) {
                 inline for (.{ sdk.canvas.WidgetKind.dialog, sdk.canvas.WidgetKind.drawer, sdk.canvas.WidgetKind.sheet }) |kind| {
                     var ui = Ui.init(arena.allocator());
@@ -1356,7 +1356,7 @@ pub fn testContentSurfaceRecords() !void {
             }
         }
     }
-    inline for (@typeInfo(core.Msg).@"union".fields, 0..) |field, tag| {
+    inline for (typeFields(@typeInfo(core.Msg).@"union"), 0..) |field, tag| {
         if (field.type == void) {
             try testAuthoredPrimitiveRecords(@unionInit(core.Msg, field.name, {}), @intCast(tag));
             return;
@@ -1475,7 +1475,7 @@ pub fn testByteTextRecords() !void {
             \\{"end":4,"kind":"text","text":"","spans":[{"text":"replacement","textBytes":[255,0]}]}]}
         ;
         const tag = comptime blk: {
-            for (@typeInfo(core.Msg).@"union".fields, 0..) |field, index| if (field.type == void) break :blk index;
+            for (typeFields(@typeInfo(core.Msg).@"union"), 0..) |field, index| if (field.type == void) break :blk index;
             break :blk 255;
         };
         var tag_buffer: [3]u8 = undefined;
@@ -1543,7 +1543,7 @@ pub fn testTerminalRecords() !void {
             "{\"format\":2,\"nodes\":[{\"end\":1,\"kind\":\"terminal\",\"text\":\"\",\"ptyBytes\":[256]}]}",
             "{\"format\":2,\"nodes\":[{\"end\":1,\"kind\":\"terminal\",\"text\":\"\",\"scrollback\":4294967296}]}",
         }) |source| try std.testing.expectError(error.InvalidView, decode(&ui, source));
-        inline for (@typeInfo(core.Msg).@"union".fields, 0..) |field, tag| {
+        inline for (typeFields(@typeInfo(core.Msg).@"union"), 0..) |field, tag| {
             if (comptime !sdk.canvas.ui_markup_reflect.declaredTerminalStateRecord(field.type)) try std.testing.expectError(error.InvalidView, terminalEvent(tag));
         }
     } else return error.SkipZigTest;
@@ -1628,4 +1628,42 @@ test "compiled app chart rejects misplaced metadata unbounded samples and invali
     var ui = Ui.init(arena.allocator());
     const bytes = try std.fmt.allocPrint(arena.allocator(), "{{\"format\":2,\"nodes\":[{{\"end\":1,\"kind\":\"chart\",\"text\":\"\",\"chartSeries\":[{{\"kind\":\"line\",\"values\":[{s}],\"color\":\"accent\",\"fill\":false,\"label\":[]}}],\"chartXLabels\":[]}}]}}", .{values});
     try std.testing.expectError(error.InvalidView, decode(&ui, bytes));
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

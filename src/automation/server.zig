@@ -429,7 +429,7 @@ test "server acks undispatchable command entries instead of stranding the queue"
 
     // Same for a line larger than the caller's buffer.
     var oversized_buffer: [64]u8 = undefined;
-    const oversized = "widget-key canvas " ++ "x" ** 256 ++ "\n";
+    const oversized = "widget-key canvas " ++ strRepeat("x", 256) ++ "\n";
     try writeQueueEntry(std.testing.io, server, 3, oversized);
     try std.testing.expectError(error.CommandTooLarge, server.takeCommand(&oversized_buffer));
     try std.testing.expect(!queueEntryExists(std.testing.io, server, 3));
@@ -501,4 +501,16 @@ test "server defers an incomplete queue head and reaps it once abandoned" {
     try std.testing.expect(!queueEntryExists(std.testing.io, server, 4));
     const alive = (try server.takeCommand(&command_buffer)).?;
     try std.testing.expectEqualStrings("app.alive", alive.value);
+}
+
+/// Comptime string repetition; replaces the `**` operator removed in Zig 0.17.
+inline fn strRepeat(comptime s: []const u8, comptime n: usize) *const [s.len * n:0]u8 {
+    const rep_result = comptime blk: {
+        @setEvalBranchQuota(n * (s.len + 4) + 1000);
+        var buf: [s.len * n:0]u8 = undefined;
+        for (0..n) |i| @memcpy(buf[i * s.len ..][0..s.len], s);
+        const rep_final = buf;
+        break :blk rep_final;
+    };
+    return &rep_result;
 }

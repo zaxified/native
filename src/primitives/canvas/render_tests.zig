@@ -2364,7 +2364,7 @@ test "canvas gpu packet text serializes engine measured line breaks" {
     const tight_width = estimateTextWidth("Songs", 12);
     // 70 explicit lines exceed the packet line budget (64): the serializer
     // must fall back to `null` so the host keeps its wrapping fallback.
-    const overflow_text = "a\n" ** 70;
+    const overflow_text = strRepeat("a\n", 70);
     const commands = [_]CanvasGpuCommand{
         .{
             .command_index = 0,
@@ -3279,4 +3279,16 @@ test "canvas frame plan reports diff storage overflow" {
         .glyph_atlas_entries = &glyphs,
         .changes = &changes,
     }));
+}
+
+/// Comptime string repetition; replaces the `**` operator removed in Zig 0.17.
+inline fn strRepeat(comptime s: []const u8, comptime n: usize) *const [s.len * n:0]u8 {
+    const rep_result = comptime blk: {
+        @setEvalBranchQuota(n * (s.len + 4) + 1000);
+        var buf: [s.len * n:0]u8 = undefined;
+        for (0..n) |i| @memcpy(buf[i * s.len ..][0..s.len], s);
+        const rep_final = buf;
+        break :blk rep_final;
+    };
+    return &rep_result;
 }

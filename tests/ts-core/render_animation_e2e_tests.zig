@@ -117,7 +117,7 @@ test "compiled render animation replacement damage preserves first-match IDs f32
         try dirtyParity(view, &animations);
     }
     for (0..6) |axis| for (values) |value| {
-        if (builtin.mode != .ReleaseFast and !std.math.isFinite(value)) continue;
+        if (builtin.mode != .fast and !std.math.isFinite(value)) continue;
         animations[0].to_transform = .{};
         switch (axis) {
             0 => animations[0].to_transform.?.a = value,

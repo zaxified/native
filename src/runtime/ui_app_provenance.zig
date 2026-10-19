@@ -492,7 +492,7 @@ test "provenance record caps truncate honestly" {
     var chain: [max_chain + 2]canvas.ui_provenance.UseSite = undefined;
     for (&chain) |*site| site.* = .{ .src_path = "a.native", .span = .{ .start = 1, .end = 2 }, .line = 1, .column = 1 };
     const source = canvas.ui_provenance.NodeSource{ .src_path = "a.native", .span = .{ .start = 0, .end = 4 }, .chain = &chain };
-    const long_key = "k" ** (max_key_bytes + 8);
+    const long_key = strRepeat("k", max_key_bytes + 8);
     const keys = [_]canvas.ui_provenance.Key{.{ .str = long_key }};
     try table.appendRecord(5, &source, &keys, false);
     const record = table.find(5).?;
@@ -509,4 +509,16 @@ test "file table one past errors named" {
         try table.addFile("x.native", "src/x.native", index);
     }
     try std.testing.expectError(error.WidgetProvenanceFileLimitReached, table.addFile("y.native", "src/y.native", 1));
+}
+
+/// Comptime string repetition; replaces the `**` operator removed in Zig 0.17.
+inline fn strRepeat(comptime s: []const u8, comptime n: usize) *const [s.len * n:0]u8 {
+    const rep_result = comptime blk: {
+        @setEvalBranchQuota(n * (s.len + 4) + 1000);
+        var buf: [s.len * n:0]u8 = undefined;
+        for (0..n) |i| @memcpy(buf[i * s.len ..][0..s.len], s);
+        const rep_final = buf;
+        break :blk rep_final;
+    };
+    return &rep_result;
 }

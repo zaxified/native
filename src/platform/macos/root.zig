@@ -478,7 +478,7 @@ extern fn native_sdk_appkit_set_tray_callback(host: *AppKitHost, callback: AppKi
 /// icon from the bundle's .icns (already masked at package time), and
 /// prebuilt .icns paths ship untouched in every mode.
 fn devDockIconNeedsMask(path: []const u8) bool {
-    if (builtin.mode != .Debug) return false;
+    if (builtin.mode != .debug) return false;
     return app_icon.sourceKindForPath(path) != null;
 }
 
@@ -656,7 +656,7 @@ pub const MacPlatform = struct {
     /// every push happens on the main thread (the host's frame pump is
     /// a run-loop timer), so a plain field is race-free.
     video_sink: platform_mod.VideoFrameSink = .{},
-    audio_capture_sinks: [2]platform_mod.AudioCaptureSink = [_]platform_mod.AudioCaptureSink{.{}} ** 2,
+    audio_capture_sinks: [2]platform_mod.AudioCaptureSink = @as([2]platform_mod.AudioCaptureSink, @splat(.{})),
 
     pub fn init(title: []const u8, size: geometry.SizeF) Error!MacPlatform {
         return initWithEngine(title, size, .system);

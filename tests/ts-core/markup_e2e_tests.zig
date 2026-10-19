@@ -627,7 +627,7 @@ test "the wiring channels drive the core: frame, key, appearance, and chrome" {
 test "boot images register and launch env overrides dispatch at install" {
     // A tiny PNG through the engine's own encoder — the register path
     // the wiring's app.zon assets ride, no side door into the registry.
-    const rgba = [_]u8{ 255, 0, 0, 255 } ** 4;
+    const rgba = arrRepeat(u8, &.{ 255, 0, 0, 255 }, 4);
     var encoded: [256]u8 = undefined;
     var png_writer = std.Io.Writer.fixed(&encoded);
     try canvas.png.writeRgba8(&png_writer, 2, 2, &rgba);
@@ -751,7 +751,7 @@ const BoardSnapshot = struct {
             .doneCount = m.doneCount,
             .nextId = m.nextId,
             .stampMs = m.stampMs,
-            .banner = [_]u8{0} ** 16,
+            .banner = @as([16]u8, @splat(0)),
             .banner_len = @min(m.banner.len, 16),
         };
         @memcpy(snapshot.banner[0..snapshot.banner_len], m.banner[0..snapshot.banner_len]);
@@ -945,4 +945,12 @@ test "a recorded tooltip hover dwell replays its show and hide frames byte-ident
     try std.testing.expect(report.events_replayed > 0);
     try std.testing.expect(report.checkpoints_verified > 0);
     try std.testing.expectEqual(fingerprint, harness.runtime.sessionStateFingerprint());
+}
+
+/// Comptime array repetition; replaces the `**` operator removed in Zig 0.17.
+fn arrRepeat(comptime T: type, comptime unit: []const T, comptime n: usize) [unit.len * n]T {
+    @setEvalBranchQuota(n * (unit.len + 4) + 1000);
+    var buf: [unit.len * n]T = undefined;
+    for (0..n) |i| @memcpy(buf[i * unit.len ..][0..unit.len], unit);
+    return buf;
 }

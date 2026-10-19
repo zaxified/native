@@ -71,7 +71,7 @@ test "compiled widget metric paragraphs preserve all-span scale and bounded line
     var spans: [34]c.TextSpan = @splat(.{ .text = "x\n" });
     spans[33].scale = 4;
     try compare(&spans, .{ .size = 10 }, 0, 160);
-    const long = [_]c.TextSpan{.{ .text = "row\n" ** 260 }};
+    const long = [_]c.TextSpan{.{ .text = strRepeat("row\n", 260) }};
     for ([_]usize{ 0, 120, 128, 255, 260 }) |first| try compare(&long, .{ .size = 12, .max_width = 80 }, first, 192);
 }
 test "compiled widget metric paragraphs preserve exceptional size scale and line-height words" {
@@ -122,4 +122,16 @@ test "compiled widget metric paragraphs keep retained cache owners distinct and 
     try std.testing.expectEqual(@as(usize, 0), paragraph_calls);
     try std.testing.expectEqual([8]usize{ 0, 0, 0, 1, 1, 0, 0, 1 }, cache_calls);
     for (hit.runs) |run| try std.testing.expect(@intFromPtr(run.text.ptr) >= @intFromPtr(&copied) and @intFromPtr(run.text.ptr) + run.text.len <= @intFromPtr(&copied) + copied.len);
+}
+
+/// Comptime string repetition; replaces the `**` operator removed in Zig 0.17.
+inline fn strRepeat(comptime s: []const u8, comptime n: usize) *const [s.len * n:0]u8 {
+    const rep_result = comptime blk: {
+        @setEvalBranchQuota(n * (s.len + 4) + 1000);
+        var buf: [s.len * n:0]u8 = undefined;
+        for (0..n) |i| @memcpy(buf[i * s.len ..][0..s.len], s);
+        const rep_final = buf;
+        break :blk rep_final;
+    };
+    return &rep_result;
 }

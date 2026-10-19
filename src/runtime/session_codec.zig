@@ -61,7 +61,7 @@ const Slots = struct {
                     }
                 } else @compileError("unsupported native journal slice");
             },
-            .@"struct" => |st| inline for (st.fields) |field| {
+            .@"struct" => |st| inline for (typeFields(st)) |field| {
                 var path_buffer: [256]u8 = undefined;
                 const nested = if (path.len == 0) field.name else try std.fmt.bufPrint(&path_buffer, "{s}.{s}", .{ path, field.name });
                 try self.value(nested, @field(value_, field.name));
@@ -151,8 +151,9 @@ fn invoke(allocator: std.mem.Allocator, policy: *const fn ([]const u8, []u8) usi
     return result;
 }
 fn encode(policy: *const fn ([]const u8, []u8) usize, record: u8, value: anytype, buffer: []u8) journal.JournalError![]const u8 {
-    var scratch = std.heap.stackFallback(16 * 1024, std.heap.page_allocator);
-    const allocator = scratch.get();
+    var scratch_buf: [16 * 1024]u8 = undefined;
+    var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+    const allocator = scratch.allocator();
     var slots: Slots = .{ .allocator = allocator };
     defer slots.deinit();
     const T = @TypeOf(value);
@@ -177,7 +178,7 @@ fn initial(comptime T: type) T {
     return switch (@typeInfo(T)) {
         .@"struct" => |st| blk: {
             var result: T = undefined;
-            inline for (st.fields) |field| @field(result, field.name) = if (field.default_value_ptr) |ptr| @as(*const field.type, @ptrCast(@alignCast(ptr))).* else initial(field.type);
+            inline for (typeFields(st)) |field| @field(result, field.name) = if (field.default_value_ptr) |ptr| @as(*const field.type, @ptrCast(@alignCast(ptr))).* else initial(field.type);
             break :blk result;
         },
         .@"enum" => std.meta.tags(T)[0],
@@ -190,12 +191,12 @@ fn hydrate(program: Program, path: []const u8, comptime T: type, storage: *journ
         .void => return {},
         .@"struct" => |st| {
             var result = initial(T);
-            inline for (st.fields) |field| {
+            inline for (typeFields(st)) |field| {
                 var buffer: [256]u8 = undefined;
                 const nested = if (path.len == 0) field.name else std.fmt.bufPrint(&buffer, "{s}.{s}", .{ path, field.name }) catch unreachable;
                 if (T == platform.ShortcutModifiers) {
                     const byte = (program.span(path) orelse return result)[0];
-                    inline for (st.fields, 0..) |f, i| @field(result, f.name) = byte & (@as(u8, 1) << @intCast(i)) != 0;
+                    inline for (typeFields(st), 0..) |f, i| @field(result, f.name) = byte & (@as(u8, 1) << @intCast(i)) != 0;
                     return result;
                 }
                 if (hasSpan(program, nested)) @field(result, field.name) = hydrate(program, nested, field.type, storage);
@@ -272,8 +273,9 @@ fn hasSpan(program: Program, path: []const u8) bool {
     return false;
 }
 fn decode(policy: *const fn ([]const u8, []u8) usize, record: u8, input: []const u8, comptime T: type, storage: *journal.EventDecodeStorage) journal.JournalError!T {
-    var scratch = std.heap.stackFallback(80 * 1024, std.heap.page_allocator);
-    const allocator = scratch.get();
+    var scratch_buf: [80 * 1024]u8 = undefined;
+    var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+    const allocator = scratch.allocator();
     const program = invoke(allocator, policy, record, "", .{ .allocator = allocator }, input, 0, true) catch return error.JournalCorrupt;
     defer program.deinit();
     // Preserve the original decoder's partial path-list writes on corruption.
@@ -358,4 +360,42 @@ pub fn decodeEnd(policy: Policy, bytes: []const u8) journal.JournalError!journal
     const callback = policy orelse return reference.decodeEnd(bytes);
     var storage: journal.EventDecodeStorage = .{};
     return decode(callback, 6, bytes, journal.End, &storage);
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

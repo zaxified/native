@@ -530,7 +530,7 @@ pub fn compiledShellPlan(policy: *const fn ([]const u8, []u8) usize, bounds: geo
     const count = std.mem.readInt(u16, output[1..3], .little);
     if (count > views.len or result_length != 3 + @as(usize, count) * 50 or (output[0] == 0 and count != views.len)) @panic("invalid compiled shell plan count");
     var plan = ShellPlan{ .count = count, .invalid_parents = output[0] == 1 };
-    var seen = [_]bool{false} ** app_manifest.max_shell_views_per_window;
+    var seen = @as([app_manifest.max_shell_views_per_window]bool, @splat(false));
     for (plan.items[0..count], 0..) |*item, i| {
         const at = 3 + i * 50;
         const index = std.mem.readInt(u16, output[at..][0..2], .little);
@@ -588,7 +588,7 @@ fn shellReadRect(bytes: *const [16]u8) geometry.RectF {
 /// Production native apps apply each view as they resolve it above the OS seam.
 pub fn referenceShellPlan(bounds: geometry.RectF, views: []const app_manifest.ShellView) ShellPlan {
     var layout = ShellLayout.init(bounds, views);
-    var created = [_]bool{false} ** app_manifest.max_shell_views_per_window;
+    var created = @as([app_manifest.max_shell_views_per_window]bool, @splat(false));
     var plan: ShellPlan = .{};
     while (plan.count < views.len) {
         var progressed = false;

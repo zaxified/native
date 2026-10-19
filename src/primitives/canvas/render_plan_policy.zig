@@ -4,7 +4,7 @@ const canvas = @import("root.zig");
 const cache = @import("render_cache_policy.zig");
 const Affine = @import("drawing.zig").Affine;
 comptime {
-    const fields = @typeInfo(canvas.CanvasCommand).@"union".fields;
+    const fields = typeFields(@typeInfo(canvas.CanvasCommand).@"union");
     const names = .{ "push_clip", "pop_clip", "push_opacity", "pop_opacity", "transform", "fill_rect", "stroke_rect", "fill_rounded_rect", "draw_line", "fill_path", "stroke_path", "draw_image", "draw_text", "shadow", "blur" };
     if (fields.len != names.len) @compileError("update the compiled render command wire tags");
     for (names, 0..) |name, i| if (!std.mem.eql(u8, name, fields[i].name)) @compileError("compiled render command wire tag changed");
@@ -196,4 +196,42 @@ fn putAffine(bytes: []u8, at: usize, value: Affine) void {
 }
 fn affine(bytes: []const u8, at: usize) Affine {
     return .{ .a = float(bytes, at), .b = float(bytes, at + 4), .c = float(bytes, at + 8), .d = float(bytes, at + 12), .tx = float(bytes, at + 16), .ty = float(bytes, at + 20) };
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

@@ -12,7 +12,7 @@ fn countedEstimatorPolicy(request: []const u8, result: []u8) usize {
 }
 test "compiled text runs keep mono estimator walks bounded with complete native geometry" {
     _ = core.initialModel();
-    const bytes = "café🙂 \xff\xe2\x80" ** 1000;
+    const bytes = strRepeat("café🙂 \xff\xe2\x80", 1000);
     var text = run(bytes);
     text.font_id = c.default_mono_font_id;
     const line: c.TextLine = .{ .text_len = bytes.len };
@@ -93,7 +93,7 @@ test "compiled text runs preserve complete plain lines overflow alignment and st
             try compare(run(bytes), .{ .max_width = width, .wrap = wrap, .alignment = alignment, .overflow = overflow }, 400);
         }
     };
-    for ([_]usize{ 0, 1, 4 }) |capacity| try compare(run("line\n" ** 260), .{ .max_width = 60 }, capacity);
+    for ([_]usize{ 0, 1, 4 }) |capacity| try compare(run(strRepeat("line\n", 260)), .{ .max_width = 60 }, capacity);
 }
 const Trace = struct {
     const Call = struct { kind: u8, start_hash: u64, len: usize, font: u64, size: f32 };
@@ -151,7 +151,7 @@ fn compareBounds(text: c.DrawText, batched: bool, ink_mode: u8, provider: bool) 
 }
 test "compiled text bounds preserve complete metrics ink unions and callback order" {
     _ = core.initialModel();
-    for ([_][]const u8{ "", "a", "italic overhang  ", "é🙂\nlast", "line\n" ** 70 }) |bytes| {
+    for ([_][]const u8{ "", "a", "italic overhang  ", "é🙂\nlast", strRepeat("line\n", 70) }) |bytes| {
         for ([_]bool{ false, true }) |provider| for ([_]bool{ false, true }) |batched| for (0..4) |ink_mode| {
             var text = run(bytes);
             try compareBounds(text, batched, @intCast(ink_mode), provider);
@@ -402,4 +402,16 @@ test "text query copied transport rejects unsafe output indices and malformed ca
     std.mem.writeInt(u32, corrupt[124..128], 3, .little);
     try std.testing.expect(!query.resultValid(&packet, &corrupt));
     try std.testing.expect(!query.resultValid(&packet, result[0..1023]));
+}
+
+/// Comptime string repetition; replaces the `**` operator removed in Zig 0.17.
+inline fn strRepeat(comptime s: []const u8, comptime n: usize) *const [s.len * n:0]u8 {
+    const rep_result = comptime blk: {
+        @setEvalBranchQuota(n * (s.len + 4) + 1000);
+        var buf: [s.len * n:0]u8 = undefined;
+        for (0..n) |i| @memcpy(buf[i * s.len ..][0..s.len], s);
+        const rep_final = buf;
+        break :blk rep_final;
+    };
+    return &rep_result;
 }

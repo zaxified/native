@@ -261,21 +261,12 @@ pub fn RuntimeFlow(comptime Runtime: type) type {
                     // platform stop path and the only trace is a bare
                     // `app.stop` right after `start` — which reads like a
                     // clean exit while the main window sits blank.
-                    errdefer |err| recordDispatchError(self, "app_start", err);
-                    launch_timing.lap("app_start");
-                    try reservePrimaryStartupWindow(self);
-                    try app.start(self);
-                    if (self.options.extensions) |registry| try registry.startAll(extensionContext(self));
-                    try dispatchEvent(self, app, .{ .lifecycle = .start });
-                    launch_timing.lap("app_started");
-                    if (try app.scene()) |scene| {
-                        try loadScene(self, app, scene);
-                    } else {
-                        try loadStartupWindows(self, app);
-                    }
-                    launch_timing.lap("scene_loaded");
-                    self.invalidateFor(.startup, null);
-                    log(self, "app.start", "app started", &.{trace.string("app", app.name)});
+                    // Zig 0.17 removed `errdefer |err|`: the startup steps run in startAppSteps
+                    // and a failure is recorded on the way out.
+                    startAppSteps(self, app) catch |err| {
+                        recordDispatchError(self, "app_start", err);
+                        return err;
+                    };
                 },
                 .app_activated => {
                     try WindowViewMethods().setAppActive(self, true);
@@ -532,6 +523,23 @@ pub fn RuntimeFlow(comptime Runtime: type) type {
                     log(self, "app.stop", "app stopped", &.{trace.string("app", app.name)});
                 },
             }
+        }
+
+        fn startAppSteps(self: *Runtime, app: App) anyerror!void {
+            launch_timing.lap("app_start");
+            try reservePrimaryStartupWindow(self);
+            try app.start(self);
+            if (self.options.extensions) |registry| try registry.startAll(extensionContext(self));
+            try dispatchEvent(self, app, .{ .lifecycle = .start });
+            launch_timing.lap("app_started");
+            if (try app.scene()) |scene| {
+                try loadScene(self, app, scene);
+            } else {
+                try loadStartupWindows(self, app);
+            }
+            launch_timing.lap("scene_loaded");
+            self.invalidateFor(.startup, null);
+            log(self, "app.start", "app started", &.{trace.string("app", app.name)});
         }
 
         pub fn dispatchEvent(self: *Runtime, app: App, event_value: Event) anyerror!void {

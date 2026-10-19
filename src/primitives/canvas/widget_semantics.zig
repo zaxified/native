@@ -25,14 +25,15 @@ const max_widget_depth: usize = 32;
 
 pub fn collectWidgetSemantics(layout: anytype, output: []WidgetSemanticsNode, scroll_semantics_fn: anytype) Error![]const WidgetSemanticsNode {
     if (layoutPolicy(layout)) |policy| {
-        var scratch = std.heap.stackFallback(4096, std.heap.page_allocator);
-        const plan = @import("semantic_tree_policy.zig").Plan.init(scratch.get(), policy, layout, null, output.len, null, @import("widget_layout.zig").virtualWidgetScrollContentExtent, true) catch @panic("semantic tree allocation failed");
+        var scratch_buf: [4096]u8 = undefined;
+        var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+        const plan = @import("semantic_tree_policy.zig").Plan.init(scratch.allocator(), policy, layout, null, output.len, null, @import("widget_layout.zig").virtualWidgetScrollContentExtent, true) catch @panic("semantic tree allocation failed");
         defer plan.deinit();
         plan.run();
         return plan.copy(layout, output);
     }
     var len: usize = 0;
-    var semantic_stack: [max_widget_depth]?usize = [_]?usize{null} ** max_widget_depth;
+    var semantic_stack: [max_widget_depth]?usize = @as([max_widget_depth]?usize, @splat(null));
     var hidden_depth: ?usize = null;
     var concealed_depth: ?usize = null;
 
@@ -444,8 +445,9 @@ pub const WidgetScrollSemantics = struct {
 /// node.
 pub fn widgetScrollAxisMetrics(layout: anytype, node_index: usize, virtual_content_extent_fn: anytype, comptime axis: ScrollAxis, viewport: geometry.RectF) WidgetScrollMetrics {
     if (layoutPolicy(layout)) |policy| {
-        var scratch = std.heap.stackFallback(4096, std.heap.page_allocator);
-        const plan = @import("semantic_tree_policy.zig").Plan.init(scratch.get(), policy, layout, node_index, 1, viewport, virtual_content_extent_fn, axis == .vertical) catch @panic("scroll observation allocation failed");
+        var scratch_buf: [4096]u8 = undefined;
+        var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+        const plan = @import("semantic_tree_policy.zig").Plan.init(scratch.allocator(), policy, layout, node_index, 1, viewport, virtual_content_extent_fn, axis == .vertical) catch @panic("scroll observation allocation failed");
         defer plan.deinit();
         plan.run();
         return plan.axis(axis == .horizontal);
@@ -490,8 +492,9 @@ pub fn widgetScrollAxisMetrics(layout: anytype, node_index: usize, virtual_conte
 pub fn widgetScrollSemantics(layout: anytype, node_index: usize, virtual_content_extent_fn: anytype) WidgetScrollSemantics {
     if (node_index >= layout.nodes.len) return .{};
     if (layoutPolicy(layout)) |policy| {
-        var scratch = std.heap.stackFallback(4096, std.heap.page_allocator);
-        const plan = @import("semantic_tree_policy.zig").Plan.init(scratch.get(), policy, layout, node_index, 1, null, virtual_content_extent_fn, true) catch @panic("scroll semantics allocation failed");
+        var scratch_buf: [4096]u8 = undefined;
+        var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+        const plan = @import("semantic_tree_policy.zig").Plan.init(scratch.allocator(), policy, layout, node_index, 1, null, virtual_content_extent_fn, true) catch @panic("scroll semantics allocation failed");
         defer plan.deinit();
         plan.run();
         return plan.scroll();

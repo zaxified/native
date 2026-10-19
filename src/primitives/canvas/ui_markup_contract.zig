@@ -220,7 +220,7 @@ fn describeGroupSeen(comptime T: type, comptime seen: []const type) Group {
     comptime {
         var scalars: []const Scalar = &.{};
         var groups: []const NamedGroup = &.{};
-        for (@typeInfo(T).@"struct".fields) |field| {
+        for (typeFields(@typeInfo(T).@"struct")) |field| {
             if (reflect.supportedScalar(field.type)) {
                 scalars = scalars ++ &[_]Scalar{.{
                     .name = field.name,
@@ -243,7 +243,7 @@ fn describeGroupSeen(comptime T: type, comptime seen: []const type) Group {
                 }};
             }
         }
-        for (@typeInfo(T).@"struct".decls) |decl| {
+        for (typeDecls(@typeInfo(T).@"struct")) |decl| {
             const DeclType = @TypeOf(@field(T, decl.name));
             if (@typeInfo(DeclType) != .@"fn") continue;
             const info = @typeInfo(DeclType).@"fn";
@@ -295,14 +295,14 @@ fn describeItem(comptime Item: type) Iterable {
 fn describeIterables(comptime Model: type) []const Iterable {
     comptime {
         var iterables: []const Iterable = &.{};
-        for (@typeInfo(Model).@"struct".fields) |field| {
+        for (typeFields(@typeInfo(Model).@"struct")) |field| {
             if (reflect.sliceElement(field.type)) |Item| {
                 var entry = describeItem(Item);
                 entry.name = field.name;
                 iterables = iterables ++ &[_]Iterable{entry};
             }
         }
-        for (@typeInfo(Model).@"struct".decls) |decl| {
+        for (typeDecls(@typeInfo(Model).@"struct")) |decl| {
             const DeclType = @TypeOf(@field(Model, decl.name));
             if (reflect.sliceElement(DeclType)) |Item| {
                 var entry = describeItem(Item);
@@ -330,7 +330,7 @@ fn describeVirtualEstimators(comptime Model: type) []const []const u8 {
     comptime {
         var names: []const []const u8 = &.{};
         if (@hasDecl(Model, "virtualExtentHelper") and @hasDecl(Model, "virtualExtentEstimate")) {
-            for (@typeInfo(Model).@"struct".decls) |decl| {
+            for (typeDecls(@typeInfo(Model).@"struct")) |decl| {
                 if (Model.virtualExtentHelper(decl.name) != null) names = names ++ &[_][]const u8{decl.name};
             }
         }
@@ -341,7 +341,7 @@ fn describeVirtualEstimators(comptime Model: type) []const []const u8 {
 fn describeMsgs(comptime Msg: type, comptime specials: Specials) []const MsgTag {
     comptime {
         var tags: []const MsgTag = &.{};
-        for (@typeInfo(Msg).@"union".fields) |field| {
+        for (typeFields(@typeInfo(Msg).@"union")) |field| {
             tags = tags ++ &[_]MsgTag{.{
                 .name = field.name,
                 .payload = payloadClassOf(field.type, specials),
@@ -395,7 +395,7 @@ fn optOutNames(comptime T: type) []const []const u8 {
         switch (@typeInfo(V)) {
             .@"struct" => |info| {
                 if (!info.is_tuple) @compileError(teaching);
-                for (info.fields) |field| {
+                for (typeFields(info)) |field| {
                     const name: []const u8 = @field(value, field.name);
                     names = names ++ &[_][]const u8{name};
                 }
@@ -1980,4 +1980,54 @@ pub fn emitMain(comptime app: type, comptime specials: Specials, init: std.proce
         std.Io.Dir.cwd().createDirPath(init.io, dir) catch {};
     }
     try std.Io.Dir.cwd().writeFile(init.io, .{ .sub_path = out_path, .data = out.written() });
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
+}
+
+const TypeDecl = struct { name: [:0]const u8 };
+
+inline fn typeDecls(comptime info: anytype) []const TypeDecl {
+    const result = comptime blk: {
+        var out: [info.decl_names.len]TypeDecl = undefined;
+        for (info.decl_names, 0..) |n, i| out[i] = .{ .name = n };
+        const final = out;
+        break :blk final;
+    };
+    return &result;
 }

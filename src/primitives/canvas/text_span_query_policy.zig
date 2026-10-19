@@ -19,8 +19,9 @@ pub const Query = struct {
 };
 pub const Result = struct { present: bool, first: usize, last: usize, x: f32, len: usize };
 pub fn bounds(policy: Policy, layout: spans_model.TextSpanLayout, span_index: usize) ?geometry.RectF {
-    var scratch = std.heap.stackFallback(4096, std.heap.page_allocator);
-    const allocator = scratch.get();
+    var scratch_buf: [4096]u8 = undefined;
+    var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+    const allocator = scratch.allocator();
     const total = std.math.add(usize, 24, std.math.mul(usize, layout.runs.len, 24) catch @panic("span bounds run capacity")) catch @panic("span bounds packet capacity");
     const packet = allocator.alloc(u8, total) catch @panic("span bounds allocation");
     defer allocator.free(packet);
@@ -67,7 +68,7 @@ pub fn resultValid(request: []const u8, result: []const u8) bool {
         !std.mem.eql(u8, request[0..3], result[0..3]) or !std.mem.eql(u8, request[4..80], result[4..80]) or
         word(result, 12) != request.len or word(result, 96) != 0 or word(result, 104) > 1 or word(result, 112) > 1 or
         word(result, 152) > 160 or word(result, 156) > 160 or word(result, 164) > word(request, 8)) return false;
-    const reserved_zero = [_]u8{0} ** 168;
+    const reserved_zero = @as([168]u8, @splat(0));
     if (!std.mem.eql(u8, result[344..512], &reserved_zero)) return false;
     const mode = request[2];
     const source_len = if (mode == 0) word(request, 40) else word(request, 20);

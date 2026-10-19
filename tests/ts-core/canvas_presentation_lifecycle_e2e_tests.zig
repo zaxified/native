@@ -92,7 +92,7 @@ test "compiled presentation lifecycle preserves complete native fallback diagnos
     const detail = "draw_text_layout_with_an_entirely_unrepresentable_command";
     var programs: usize = 0;
     for (sizes[0 .. sizes.len - 1]) |count| for (sizes[0 .. sizes.len - 1]) |logged| for (reasons) |before| for (reasons) |after| {
-        if ((builtin.mode == .Debug or builtin.mode == .ReleaseSafe) and count != 0 and before == after and count + 1 < logged) continue;
+        if ((builtin.mode == .debug or builtin.mode == .safe) and count != 0 and before == after and count + 1 < logged) continue;
         var expected = Diagnostics{};
         expected.views[0].gpu_present_fallback_frame_count = count;
         expected.views[0].gpu_present_fallback_logged_count = logged;
@@ -114,7 +114,7 @@ test "compiled presentation lifecycle preserves complete native fallback diagnos
 test "compiled presentation lifecycle preserves checked counter overflow and release wrapping verdicts" {
     _ = core.initialModel();
     defer core.rt.frameReset();
-    const checked = builtin.mode == .Debug or builtin.mode == .ReleaseSafe;
+    const checked = builtin.mode == .debug or builtin.mode == .safe;
     const max: usize = std.math.maxInt(usize);
     const full = p.plan(.fallback, .{ .fallback_count = max, .logged_count = 0, .previous_reason = .missing_service, .reason = .missing_service }, observed);
     try exact(checked, full.overflow);

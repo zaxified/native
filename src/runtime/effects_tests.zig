@@ -28,7 +28,7 @@ const max_recorded_output_bytes = 128;
 
 const StreamModel = struct {
     line_storage: [max_recorded_lines][max_recorded_line_bytes]u8 = undefined,
-    line_lens: [max_recorded_lines]usize = [_]usize{0} ** max_recorded_lines,
+    line_lens: [max_recorded_lines]usize = @as([max_recorded_lines]usize, @splat(0)),
     line_count: usize = 0,
     truncated_count: usize = 0,
     // Full-length proof for lines beyond the recording prefix (raised
@@ -389,7 +389,7 @@ test "queue overflow drops lines with a carried drop count and truncates over-lo
     try std.testing.expectEqual(@as(u32, 0), h.app_state.model.dropped_before_total);
 
     // Over-long lines arrive truncated and flagged.
-    const long_line = [_]u8{'x'} ** (effects_mod.max_effect_line_bytes + 100);
+    const long_line = @as([effects_mod.max_effect_line_bytes + 100]u8, @splat('x'));
     try fx.feedLine(stream_key, &long_line);
     try h.drainWakes();
     try std.testing.expectEqual(@as(usize, 1), h.app_state.model.truncated_count);
@@ -643,7 +643,7 @@ fn rejectUpdate(model: *RejectModel, msg: RejectMsg, fx: *RejectEffects) void {
             fx.spawn(.{ .key = 500, .argv = &.{"cmd"}, .on_exit = RejectEffects.exitMsg(.done) });
         },
         .spawn_huge => {
-            const huge = [_]u8{'a'} ** (effects_mod.max_effect_argv_bytes + 1);
+            const huge = @as([effects_mod.max_effect_argv_bytes + 1]u8, @splat('a'));
             fx.spawn(.{ .key = 600, .argv = &.{&huge}, .on_exit = RejectEffects.exitMsg(.done) });
         },
         .done => |exit| switch (exit.reason) {

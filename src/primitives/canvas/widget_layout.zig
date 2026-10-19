@@ -184,8 +184,9 @@ fn layoutRootRelativeModalChildren(
     tokens: DesignTokens,
 ) Error!void {
     if (tokens.layout_coordination_policy) |policy| {
-        var scratch = std.heap.stackFallback(1024, std.heap.page_allocator);
-        const plan = coordination.ChildPlan.init(scratch.get(), policy, children.len, 0, .modal, root_bounds, 0) catch @panic("modal layout program allocation failed");
+        var scratch_buf: [1024]u8 = undefined;
+        var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+        const plan = coordination.ChildPlan.init(scratch.allocator(), policy, children.len, 0, .modal, root_bounds, 0) catch @panic("modal layout program allocation failed");
         defer plan.deinit();
         for (children, 0..) |child, i| plan.setChild(i, child, false);
         try applyLayoutChildren(plan, children, parent_index, depth, output, len, root_bounds, tokens);
@@ -346,8 +347,9 @@ fn layoutAnchoredChildren(
     tokens: DesignTokens,
 ) Error!void {
     if (tokens.layout_coordination_policy) |policy| {
-        var scratch = std.heap.stackFallback(1024, std.heap.page_allocator);
-        const plan = coordination.ChildPlan.init(scratch.get(), policy, children.len, 0, .anchor, anchor_rect, 0) catch @panic("anchor layout program allocation failed");
+        var scratch_buf: [1024]u8 = undefined;
+        var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+        const plan = coordination.ChildPlan.init(scratch.allocator(), policy, children.len, 0, .anchor, anchor_rect, 0) catch @panic("anchor layout program allocation failed");
         defer plan.deinit();
         for (children, 0..) |child, i| plan.setChild(i, child, false);
         try applyLayoutChildren(plan, children, parent_index, depth, output, len, root_bounds, tokens);
@@ -386,8 +388,9 @@ pub fn anchoredNestingDepth(output: []const WidgetLayoutNode, node_index: usize)
 
 pub fn anchoredNestingDepthWithTokens(output: []const WidgetLayoutNode, node_index: usize, tokens: DesignTokens) usize {
     if (tokens.layout_coordination_policy) |policy| {
-        var scratch = std.heap.stackFallback(2048, std.heap.page_allocator);
-        const plan = coordination.RetainedPlan.init(scratch.get(), policy, output) catch @panic("retained nesting allocation failed");
+        var scratch_buf: [2048]u8 = undefined;
+        var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+        const plan = coordination.RetainedPlan.init(scratch.allocator(), policy, output) catch @panic("retained nesting allocation failed");
         defer plan.deinit();
         return plan.nesting(node_index);
     }
@@ -396,8 +399,9 @@ pub fn anchoredNestingDepthWithTokens(output: []const WidgetLayoutNode, node_ind
 
 pub fn maxAnchoredNestingDepthWithTokens(output: []const WidgetLayoutNode, tokens: DesignTokens) usize {
     if (tokens.layout_coordination_policy) |policy| {
-        var scratch = std.heap.stackFallback(2048, std.heap.page_allocator);
-        const plan = coordination.RetainedPlan.init(scratch.get(), policy, output) catch @panic("retained strata allocation failed");
+        var scratch_buf: [2048]u8 = undefined;
+        var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+        const plan = coordination.RetainedPlan.init(scratch.allocator(), policy, output) catch @panic("retained strata allocation failed");
         defer plan.deinit();
         return plan.maximum();
     }
@@ -432,8 +436,9 @@ pub fn relayoutAnchoredChildrenAtDepth(output: []WidgetLayoutNode, root_bounds: 
     // O(nodes), and an open surface pays only for the bounded anchored
     // subtrees that are actually replayed.
     if (tokens.layout_coordination_policy) |policy| {
-        var scratch = std.heap.stackFallback(2048, std.heap.page_allocator);
-        const plan = coordination.RetainedPlan.init(scratch.get(), policy, output) catch @panic("retained anchor program allocation failed");
+        var scratch_buf: [2048]u8 = undefined;
+        var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+        const plan = coordination.RetainedPlan.init(scratch.allocator(), policy, output) catch @panic("retained anchor program allocation failed");
         defer plan.deinit();
         var cursor: usize = 1;
         while (plan.next(cursor, parent_anchored_depth)) |selected| {
@@ -737,8 +742,9 @@ fn layoutAxisChildrenMode(
     if (flow_count == 0) return;
 
     if (tokens.measurement_coordination_policy) |policy| {
-        var scratch = std.heap.stackFallback(4096, std.heap.page_allocator);
-        const plan = @import("measurement_coordination_policy.zig").AxisPlan.init(scratch.get(), policy, children.len, content, @intFromEnum(axis), @intFromEnum(style.main_alignment), @intFromEnum(style.cross_alignment), style.gap) catch @panic("axis measurement allocation failed");
+        var scratch_buf: [4096]u8 = undefined;
+        var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+        const plan = @import("measurement_coordination_policy.zig").AxisPlan.init(scratch.allocator(), policy, children.len, content, @intFromEnum(axis), @intFromEnum(style.main_alignment), @intFromEnum(style.cross_alignment), style.gap) catch @panic("axis measurement allocation failed");
         defer plan.deinit();
         for (children, 0..) |child, index| plan.setFlow(index, widgetTakesFlowSlot(child));
         while (true) {
@@ -761,8 +767,9 @@ fn layoutAxisChildrenMode(
     }
 
     if (tokens.container_layout_policy) |policy| {
-        var scratch = std.heap.stackFallback(4096, std.heap.page_allocator);
-        const plan = @import("container_layout_policy.zig").Plan.init(scratch.get(), policy, children.len, content, @intFromEnum(axis), @intFromEnum(style.main_alignment), @intFromEnum(style.cross_alignment), style.gap) catch @panic("container layout allocation failed");
+        var scratch_buf: [4096]u8 = undefined;
+        var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+        const plan = @import("container_layout_policy.zig").Plan.init(scratch.allocator(), policy, children.len, content, @intFromEnum(axis), @intFromEnum(style.main_alignment), @intFromEnum(style.cross_alignment), style.gap) catch @panic("container layout allocation failed");
         defer plan.deinit();
         var needs_wrapped = false;
         for (children, 0..) |child, index| {
@@ -960,7 +967,7 @@ fn logAxisChildrenOverflow(output: []const WidgetLayoutNode, parent_index: usize
     if (axis == .vertical and widgetInsideVerticalScrollScope(output, parent_index)) return;
     if (axis == .horizontal and widgetInsideHorizontalScrollScope(output, parent_index)) return;
     if (builtin.is_test) test_axis_overflow_diagnostics += 1;
-    if (builtin.mode != .Debug) return;
+    if (builtin.mode != .debug) return;
     var path_buffer: [256]u8 = undefined;
     layout_log.debug(
         "{s} children overflow the {s} axis by {d:.1}px (need {d:.1}px, have {d:.1}px): intrinsic/min sizes exceed the container - shrink the content, or give siblings grow factors or definite width/height that fit",
@@ -1054,8 +1061,9 @@ fn widgetIsSpanParagraph(widget: Widget) bool {
 
 fn widgetSubtreeHasTextSpans(widget: Widget, depth: usize, tokens: DesignTokens) bool {
     if (tokens.measurement_coordination_policy) |policy| {
-        var scratch = std.heap.stackFallback(256, std.heap.page_allocator);
-        const plan = @import("measurement_coordination_policy.zig").SpanPlan.init(scratch.get(), policy, widget, depth, max_widget_depth) catch @panic("span subtree allocation failed");
+        var scratch_buf: [256]u8 = undefined;
+        var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+        const plan = @import("measurement_coordination_policy.zig").SpanPlan.init(scratch.allocator(), policy, widget, depth, max_widget_depth) catch @panic("span subtree allocation failed");
         defer plan.deinit();
         while (true) {
             const result = plan.run();
@@ -1214,8 +1222,9 @@ fn rowChildWidthMode(row: Widget, available_width: f32, index: usize, tokens: De
             .tabs => tabsGap(row, tokens),
             else => row.layout.gap,
         };
-        var scratch = std.heap.stackFallback(4096, std.heap.page_allocator);
-        const plan = @import("container_layout_policy.zig").Plan.init(scratch.get(), policy, children.len, .init(0, 0, available_width, 0), 0, 0, 0, gap) catch @panic("row measurement allocation failed");
+        var scratch_buf: [4096]u8 = undefined;
+        var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+        const plan = @import("container_layout_policy.zig").Plan.init(scratch.allocator(), policy, children.len, .init(0, 0, available_width, 0), 0, 0, 0, gap) catch @panic("row measurement allocation failed");
         defer plan.deinit();
         for (children, 0..) |child, child_index| {
             if (!widgetTakesFlowSlot(child)) continue;
@@ -1323,8 +1332,9 @@ fn layoutTextSpanLinkChildren(
     );
 
     if (tokens.layout_coordination_policy) |policy| {
-        var scratch = std.heap.stackFallback(2048, std.heap.page_allocator);
-        const plan = coordination.ChildPlan.init(scratch.get(), policy, widget.children.len, widget.spans.len, .spans, content, 0) catch @panic("span child program allocation failed");
+        var scratch_buf: [2048]u8 = undefined;
+        var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+        const plan = coordination.ChildPlan.init(scratch.allocator(), policy, widget.children.len, widget.spans.len, .spans, content, 0) catch @panic("span child program allocation failed");
         defer plan.deinit();
         for (widget.children, 0..) |child, i| plan.setChild(i, child, false);
         for (widget.spans, 0..) |span, i| plan.setLink(i, span.link.len != 0);
@@ -1548,8 +1558,9 @@ fn layoutVirtualGridChildren(
 }
 
 fn compiledGridChildren(children: []const Widget, content: geometry.RectF, parent_index: usize, depth: usize, output: []WidgetLayoutNode, len: *usize, style: WidgetLayoutStyle, scroll_y: f32, windowed: bool, policy: @import("flow_measurement_policy.zig").Policy, tokens: DesignTokens) Error!void {
-    var scratch = std.heap.stackFallback(4096, std.heap.page_allocator);
-    const plan = @import("flow_measurement_policy.zig").GridPlan.init(scratch.get(), policy, children.len, widgetFlowChildCount(children), content, style.columns, style.virtual_overscan, style.gap, style.virtual_item_extent, scroll_y, windowed) catch @panic("grid measurement allocation failed");
+    var scratch_buf: [4096]u8 = undefined;
+    var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+    const plan = @import("flow_measurement_policy.zig").GridPlan.init(scratch.allocator(), policy, children.len, widgetFlowChildCount(children), content, style.columns, style.virtual_overscan, style.gap, style.virtual_item_extent, scroll_y, windowed) catch @panic("grid measurement allocation failed");
     defer plan.deinit();
     for (children, 0..) |child, index| plan.setChild(index, child, widgetTakesFlowSlot(child), primaryUnderlineTabsFillWidth(child, tokens));
     while (true) {
@@ -1621,8 +1632,9 @@ fn layoutScrollChildren(
 ) Error!void {
     if (tokens.flow_measurement_policy) |policy| return compiledMeasuredFlow(children, parent_index, depth, output, len, 2, .{ .content = content, .horizontal = axes.scrollsHorizontally(), .vertical = axes.scrollsVertically(), .scroll_x = scroll_offset.dx, .scroll_y = scroll_offset.dy }, policy, tokens);
     if (tokens.intrinsic_layout_policy) |policy| {
-        var scratch = std.heap.stackFallback(4096, std.heap.page_allocator);
-        const plan = @import("virtual_flow_policy.zig").Plan.init(scratch.get(), policy, children.len, .{ .content = content, .horizontal = axes.scrollsHorizontally(), .vertical = axes.scrollsVertically(), .scroll_x = scroll_offset.dx, .scroll_y = scroll_offset.dy }) catch @panic("scroll flow allocation failed");
+        var scratch_buf: [4096]u8 = undefined;
+        var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+        const plan = @import("virtual_flow_policy.zig").Plan.init(scratch.allocator(), policy, children.len, .{ .content = content, .horizontal = axes.scrollsHorizontally(), .vertical = axes.scrollsVertically(), .scroll_x = scroll_offset.dx, .scroll_y = scroll_offset.dy }) catch @panic("scroll flow allocation failed");
         defer plan.deinit();
         for (children, 0..) |child, index| if (widgetTakesFlowSlot(child)) {
             plan.setChild(index, child, 0);
@@ -1794,8 +1806,9 @@ fn layoutVariableVirtualChildren(
 }
 
 fn compiledMeasuredFlow(children: []const Widget, parent_index: usize, depth: usize, output: []WidgetLayoutNode, len: *usize, operation: u8, options: @import("virtual_flow_policy.zig").Options, policy: @import("flow_measurement_policy.zig").Policy, tokens: DesignTokens) Error!void {
-    var scratch = std.heap.stackFallback(4096, std.heap.page_allocator);
-    const plan = @import("flow_measurement_policy.zig").FlowPlan.init(scratch.get(), policy, children.len, operation, options) catch @panic("flow measurement allocation failed");
+    var scratch_buf: [4096]u8 = undefined;
+    var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+    const plan = @import("flow_measurement_policy.zig").FlowPlan.init(scratch.allocator(), policy, children.len, operation, options) catch @panic("flow measurement allocation failed");
     defer plan.deinit();
     var flow: usize = 0;
     for (children, 0..) |child, index| {
@@ -1833,8 +1846,9 @@ fn compiledMeasuredFlow(children: []const Widget, parent_index: usize, depth: us
 fn compiledVirtualVerticalChildren(children: []const Widget, content: geometry.RectF, parent_index: usize, depth: usize, output: []WidgetLayoutNode, len: *usize, scroll_y: f32, style: WidgetLayoutStyle, tokens: DesignTokens) Error!void {
     const flow_count = widgetFlowChildCount(children);
     if (flow_count == 0) return;
-    var scratch = std.heap.stackFallback(4096, std.heap.page_allocator);
-    const plan = @import("virtual_flow_policy.zig").Plan.init(scratch.get(), tokens.intrinsic_layout_policy.?, children.len, .{ .content = content, .first = style.virtual_first_index, .declared = style.virtual_item_count, .anchor = style.virtual_anchor_index, .overscan = style.virtual_overscan, .flow_count = flow_count, .gap = style.gap, .item_extent = style.virtual_item_extent, .scroll_y = scroll_y, .anchor_extent = style.virtual_anchor_extent, .total_extent = style.virtual_total_extent }) catch @panic("virtual row allocation failed");
+    var scratch_buf: [4096]u8 = undefined;
+    var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+    const plan = @import("virtual_flow_policy.zig").Plan.init(scratch.allocator(), tokens.intrinsic_layout_policy.?, children.len, .{ .content = content, .first = style.virtual_first_index, .declared = style.virtual_item_count, .anchor = style.virtual_anchor_index, .overscan = style.virtual_overscan, .flow_count = flow_count, .gap = style.gap, .item_extent = style.virtual_item_extent, .scroll_y = scroll_y, .anchor_extent = style.virtual_anchor_extent, .total_extent = style.virtual_total_extent }) catch @panic("virtual row allocation failed");
     defer plan.deinit();
     var flow: usize = 0;
     for (children, 0..) |child, index| {
@@ -1990,8 +2004,9 @@ fn layoutSplitChildren(
     tokens: DesignTokens,
 ) Error!void {
     if (tokens.layout_coordination_policy) |policy| {
-        var scratch = std.heap.stackFallback(2048, std.heap.page_allocator);
-        const plan = coordination.ChildPlan.init(scratch.get(), policy, widget.children.len, 0, .split, content, widget.layout.gap) catch @panic("split layout program allocation failed");
+        var scratch_buf: [2048]u8 = undefined;
+        var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+        const plan = coordination.ChildPlan.init(scratch.allocator(), policy, widget.children.len, 0, .split, content, widget.layout.gap) catch @panic("split layout program allocation failed");
         defer plan.deinit();
         for (widget.children, 0..) |child, i| plan.setChild(i, child, false);
         while (true) {
@@ -2106,9 +2121,10 @@ pub fn slideSplitChildren(
 
 pub fn slideSplitChildrenWithTokens(frame: geometry.RectF, fraction: f32, node_index: usize, nodes: []WidgetLayoutNode, tokens: DesignTokens) void {
     if (tokens.layout_coordination_policy) |policy| {
-        var scratch = std.heap.stackFallback(2048, std.heap.page_allocator);
+        var scratch_buf: [2048]u8 = undefined;
+        var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
         const content = frame.inset(nodes[node_index].widget.layout.padding).normalized();
-        const plan = coordination.ChildPlan.init(scratch.get(), policy, nodes.len, 0, .slide, content, 0) catch @panic("split slide program allocation failed");
+        const plan = coordination.ChildPlan.init(scratch.allocator(), policy, nodes.len, 0, .slide, content, 0) catch @panic("split slide program allocation failed");
         defer plan.deinit();
         plan.setRoot(node_index);
         for (nodes, 0..) |node, i| plan.setNode(i, node);
@@ -2201,8 +2217,9 @@ pub fn widgetKindStacksChildren(kind: widget_model.WidgetKind) bool {
 
 fn layoutStackChildren(children: []const Widget, content: geometry.RectF, parent: usize, depth: usize, output: []WidgetLayoutNode, len: *usize, tokens: DesignTokens) Error!void {
     if (tokens.layout_coordination_policy) |policy| {
-        var scratch = std.heap.stackFallback(2048, std.heap.page_allocator);
-        const plan = coordination.ChildPlan.init(scratch.get(), policy, children.len, 0, .stack, content, 0) catch @panic("stack layout program allocation failed");
+        var scratch_buf: [2048]u8 = undefined;
+        var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+        const plan = coordination.ChildPlan.init(scratch.allocator(), policy, children.len, 0, .stack, content, 0) catch @panic("stack layout program allocation failed");
         defer plan.deinit();
         for (children, 0..) |child, i| plan.setChild(i, child, primaryUnderlineTabsFillWidth(child, tokens));
         try applyLayoutChildren(plan, children, parent, depth, output, len, .init(0, 0, 0, 0), tokens);
@@ -2230,8 +2247,9 @@ fn applyReadyLayoutChildren(plan: coordination.ChildPlan, children: []const Widg
 
 fn stackChildFrame(content: geometry.RectF, child: Widget, tokens: DesignTokens) geometry.RectF {
     if (tokens.container_layout_policy) |policy| {
-        var scratch = std.heap.stackFallback(256, std.heap.page_allocator);
-        const plan = @import("container_layout_policy.zig").Plan.init(scratch.get(), policy, 1, content, 0, 0, 0, 0) catch @panic("stack layout allocation failed");
+        var scratch_buf: [256]u8 = undefined;
+        var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+        const plan = @import("container_layout_policy.zig").Plan.init(scratch.allocator(), policy, 1, content, 0, 0, 0, 0) catch @panic("stack layout allocation failed");
         defer plan.deinit();
         plan.setChild(0, .{ .flags = 1 | (if (primaryUnderlineTabsFillWidth(child, tokens)) @as(u32, 2) else 0), .main = child.frame.width, .cross = child.frame.height, .offset_main = child.frame.x, .offset_cross = child.frame.y, .min_main = child.layout.min_size.width, .max_main = child.layout.max_size.width, .min_cross = child.layout.min_size.height, .max_cross = child.layout.max_size.height });
         plan.run(3);
@@ -2313,8 +2331,9 @@ fn accordionOpenContentExtent(widget: Widget, width: f32, tokens: DesignTokens, 
 /// TypeScript selects widths, short circuits and complete height composition.
 /// Recursive calls never invalidate a borrowed core/view result.
 fn compiledWrappedExtent(widget: Widget, width: f32, tokens: DesignTokens, depth: usize, variable_row: bool, accordion_content: bool) f32 {
-    var scratch = std.heap.stackFallback(4096, std.heap.page_allocator);
-    const plan = @import("measurement_coordination_policy.zig").WrappedPlan.init(scratch.get(), widget, tokens, width, depth, max_widget_depth, variable_row, accordion_content, accordionChildrenVisible(widget)) catch @panic("wrapped measurement allocation failed");
+    var scratch_buf: [4096]u8 = undefined;
+    var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+    const plan = @import("measurement_coordination_policy.zig").WrappedPlan.init(scratch.allocator(), widget, tokens, width, depth, max_widget_depth, variable_row, accordion_content, accordionChildrenVisible(widget)) catch @panic("wrapped measurement allocation failed");
     defer plan.deinit();
     for (widget.children, 0..) |child, index| plan.setChild(index, child, widgetTakesFlowSlot(child));
     while (true) {
@@ -2337,8 +2356,9 @@ fn compiledWrappedExtentReference(widget: Widget, width: f32, tokens: DesignToke
     const padding = if (variable_row) widget.layout.padding else widgetLayoutPadding(widget, tokens);
     const text_size = widgetBodyTextSize(widget, tokens);
     const title_height = if (widget.kind == .accordion) accordionHeaderHeight(widget, tokens) else widgetLineHeightWithTokens(text_size, tokens);
-    var scratch = std.heap.stackFallback(4096, std.heap.page_allocator);
-    const plan = wrapped.Plan.init(scratch.get(), tokens.intrinsic_layout_policy.?, widget.children.len, .{
+    var scratch_buf: [4096]u8 = undefined;
+    var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+    const plan = wrapped.Plan.init(scratch.allocator(), tokens.intrinsic_layout_policy.?, widget.children.len, .{
         .kind = widget.kind,
         .spans = widget.spans.len > 0,
         .virtualized = widget.layout.virtualized,
@@ -2546,8 +2566,9 @@ fn intrinsicWidgetSizeDepth(widget: Widget, tokens: DesignTokens, depth: usize) 
 }
 
 fn compiledIntrinsicMeasure(widget: Widget, tokens: DesignTokens, depth: usize) geometry.SizeF {
-    var scratch = std.heap.stackFallback(4096, std.heap.page_allocator);
-    const plan = @import("intrinsic_measure_policy.zig").Plan.init(scratch.get(), widget, tokens, depth, max_widget_depth, booleanControlSelected(widget)) catch @panic("intrinsic measurement allocation failed");
+    var scratch_buf: [4096]u8 = undefined;
+    var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+    const plan = @import("intrinsic_measure_policy.zig").Plan.init(scratch.allocator(), widget, tokens, depth, max_widget_depth, booleanControlSelected(widget)) catch @panic("intrinsic measurement allocation failed");
     defer plan.deinit();
     for (widget.children, 0..) |child, index| plan.setChild(index, child, widgetTakesFlowSlot(child));
     while (true) {
@@ -2570,8 +2591,9 @@ fn compiledIntrinsicMeasure(widget: Widget, tokens: DesignTokens, depth: usize) 
 fn intrinsicChildSize(child: Widget, tokens: DesignTokens, depth: usize) geometry.SizeF {
     const intrinsic = intrinsicWidgetSizeDepth(child, tokens, depth);
     if (tokens.intrinsic_layout_policy) |policy| {
-        var scratch = std.heap.stackFallback(256, std.heap.page_allocator);
-        const plan = @import("intrinsic_layout_policy.zig").Plan.init(scratch.get(), policy, 1, .{}) catch @panic("intrinsic child allocation failed");
+        var scratch_buf: [256]u8 = undefined;
+        var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+        const plan = @import("intrinsic_layout_policy.zig").Plan.init(scratch.allocator(), policy, 1, .{}) catch @panic("intrinsic child allocation failed");
         defer plan.deinit();
         plan.setChild(0, intrinsicChildFacts(child, intrinsic));
         plan.run(0);
@@ -2717,8 +2739,9 @@ fn paddedIntrinsicSize(widget: Widget, tokens: DesignTokens, content: geometry.S
 
 fn paddedIntrinsicSizeWithPadding(widget: Widget, tokens: DesignTokens, content: geometry.SizeF, padding: geometry.InsetsF) geometry.SizeF {
     if (tokens.intrinsic_layout_policy) |policy| {
-        var scratch = std.heap.stackFallback(256, std.heap.page_allocator);
-        const plan = @import("intrinsic_layout_policy.zig").Plan.init(scratch.get(), policy, 0, .{ .content = content, .padding = padding, .min_size = widget.layout.min_size }) catch @panic("intrinsic padding allocation failed");
+        var scratch_buf: [256]u8 = undefined;
+        var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+        const plan = @import("intrinsic_layout_policy.zig").Plan.init(scratch.allocator(), policy, 0, .{ .content = content, .padding = padding, .min_size = widget.layout.min_size }) catch @panic("intrinsic padding allocation failed");
         defer plan.deinit();
         plan.run(6);
         return plan.size();
@@ -3264,8 +3287,9 @@ fn compiledVirtualContentExtent(widget: Widget, viewport: f32, tokens: DesignTok
     const flow_count = widgetFlowChildCount(widget.children);
     const policy = tokens.intrinsic_layout_policy.?;
     const grid = if (widget.kind == .grid and flow_count > 0 and widget.layout.virtual_item_count == 0) @import("grid_layout_policy.zig").plan(policy, flow_count, widget.layout.columns, 0, .{}, 0, 0, 0, 0, false) else null;
-    var scratch = std.heap.stackFallback(4096, std.heap.page_allocator);
-    const plan = @import("virtual_flow_policy.zig").Plan.init(scratch.get(), policy, widget.children.len, .{ .content = .init(0, 0, 0, viewport), .first = widget.layout.virtual_first_index, .declared = widget.layout.virtual_item_count, .grid_rows = if (grid) |value| value.rows else 0, .grid = widget.kind == .grid, .semantic = widget.semantics.list_item_count orelse 0, .flow_count = flow_count, .gap = widget.layout.gap, .item_extent = widget.layout.virtual_item_extent, .scroll_y = widget.value, .total_extent = widget.layout.virtual_total_extent }) catch @panic("virtual content allocation failed");
+    var scratch_buf: [4096]u8 = undefined;
+    var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+    const plan = @import("virtual_flow_policy.zig").Plan.init(scratch.allocator(), policy, widget.children.len, .{ .content = .init(0, 0, 0, viewport), .first = widget.layout.virtual_first_index, .declared = widget.layout.virtual_item_count, .grid_rows = if (grid) |value| value.rows else 0, .grid = widget.kind == .grid, .semantic = widget.semantics.list_item_count orelse 0, .flow_count = flow_count, .gap = widget.layout.gap, .item_extent = widget.layout.virtual_item_extent, .scroll_y = widget.value, .total_extent = widget.layout.virtual_total_extent }) catch @panic("virtual content allocation failed");
     defer plan.deinit();
     for (widget.children, 0..) |child, index| if (widgetTakesFlowSlot(child)) {
         plan.setChild(index, child, 0);

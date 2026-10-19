@@ -178,7 +178,7 @@ test "canvas icon registry refuses invalid complete batches without changing reg
     raw_elements[0] = .{};
     definitions[0].name = "";
     try std.testing.expectError(error.InvalidIconName, Registry.register(&definitions));
-    const long_name = [_]u8{'x'} ** (Registry.max_name_bytes + 1);
+    const long_name = @as([Registry.max_name_bytes + 1]u8, @splat('x'));
     definitions[0].name = &long_name;
     try std.testing.expectError(error.InvalidIconName, Registry.register(&definitions));
     definitions[0].name = "test";
@@ -207,8 +207,8 @@ test "canvas icon registry preserves exact capacity limits and empty replacement
     const Registry = Icons(struct {}, struct {});
     const previous = canvas.icons.appIcons();
     defer canvas.icons.registerAppIcons(previous);
-    const raw_elements = [_]TestElement{ .{} } ** (canvas.svg_icon.max_icon_elements + 1);
-    const raw_shapes = [_]TestShape{ .{ .start = 512, .count = 0 } } ** (canvas.svg_icon.max_icon_shapes + 1);
+    const raw_elements = @as([canvas.svg_icon.max_icon_elements + 1]TestElement, @splat(.{}));
+    const raw_shapes = @as([canvas.svg_icon.max_icon_shapes + 1]TestShape, @splat(.{ .start = 512, .count = 0 }));
     var names: [Registry.max_icons + 1][Registry.max_name_bytes]u8 = undefined;
     var definitions: [Registry.max_icons + 1]TestIcon = undefined;
     for (&definitions, 0..) |*definition, ordinal| {

@@ -44,7 +44,7 @@ fn hostApp(comptime Host: type, raw: ?*anyopaque) ?*Host {
 /// a `comptime` block in a static library's root module.
 pub fn exportMobileCApi(comptime Host: type) void {
     const Api = MobileCApi(Host);
-    inline for (@typeInfo(Api).@"struct".decls) |decl| {
+    inline for (typeDecls(@typeInfo(Api).@"struct")) |decl| {
         @export(&@field(Api, decl.name), .{ .name = decl.name });
     }
 }
@@ -837,3 +837,15 @@ pub const native_sdk_app_widget_action = FixedShellApi.native_sdk_app_widget_act
 pub const native_sdk_app_render_pixel_size = FixedShellApi.native_sdk_app_render_pixel_size;
 pub const native_sdk_app_render_pixels = FixedShellApi.native_sdk_app_render_pixels;
 pub const native_sdk_app_render_pixels_damage = FixedShellApi.native_sdk_app_render_pixels_damage;
+
+const TypeDecl = struct { name: [:0]const u8 };
+
+inline fn typeDecls(comptime info: anytype) []const TypeDecl {
+    const result = comptime blk: {
+        var out: [info.decl_names.len]TypeDecl = undefined;
+        for (info.decl_names, 0..) |n, i| out[i] = .{ .name = n };
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}

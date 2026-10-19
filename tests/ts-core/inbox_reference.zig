@@ -59,7 +59,7 @@ pub const Filter = enum { all, active, done };
 
 pub const Task = struct {
     id: u32,
-    title_storage: [max_task_title]u8 = [_]u8{0} ** max_task_title,
+    title_storage: [max_task_title]u8 = @as([max_task_title]u8, @splat(0)),
     title_len: usize = 0,
     done: bool = false,
 
@@ -221,7 +221,7 @@ pub const CompiledInboxView = canvas.CompiledMarkupView(Model, Msg, inbox_markup
 
 /// Debug builds keep the interpreter for .native hot reload; release builds
 /// ship the comptime-compiled view with no parser in the binary.
-const dev_markup_reload = builtin.mode == .Debug;
+const dev_markup_reload = builtin.mode == .debug;
 
 // -------------------------------------------------------------------- app
 //

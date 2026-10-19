@@ -15,7 +15,7 @@ pub const Request = struct {
 };
 pub fn decide(policy: Policy, request: Request) u8 {
     if (policy) |callback| {
-        var bytes = [_]u8{0} ** 16;
+        var bytes = @as([16]u8, @splat(0));
         bytes[0..5].* = .{ 35, @intFromEnum(request.stage), request.phase, request.facts, request.modifiers };
         std.mem.writeInt(u32, bytes[8..12], @bitCast(request.delta.dx), .little);
         std.mem.writeInt(u32, bytes[12..16], @bitCast(request.delta.dy), .little);

@@ -63,7 +63,7 @@ pub fn resultValid(request: []const u8, result: []const u8) bool {
         word(result, 316) > 64 or result[514] > 8 or result[515] > 2 or
         word(result, 556) > (if (result[514] == 0 and glyph_count > 0) glyph_count else text_len) or
         word(result, 564) > 1) return false;
-    const reserved_zero = [_]u8{0} ** 72;
+    const reserved_zero = @as([72]u8, @splat(0));
     if (!std.mem.eql(u8, result[440..512], &reserved_zero)) return false;
     if (result[3] == 2) return word(result, 80) == 0 and word(result, 84) == 0 and word(result, 92) == 0 and word(result, 100) == 0 and word(result, 304) <= text_len;
     if (word(result, 92) != 0) return false;

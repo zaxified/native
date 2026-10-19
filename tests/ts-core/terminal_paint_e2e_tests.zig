@@ -44,7 +44,7 @@ fn paired(viewport: grid.TerminalGrid, capacity: usize, options: grid.TerminalPa
     const empty: c.PathElement = .{ .verb = .move_to, .points = .{ .zero(), .zero(), .zero() } };
     @memset(left.path_elements[0..initial_paths], empty);
     @memset(right.path_elements[0..initial_paths], empty);
-    const prior_paths = [_]c.PathElement{empty} ** 6;
+    const prior_paths = @as([6]c.PathElement, @splat(empty));
     if (sibling and capacity >= 2) {
         for ([_]*c.Builder{ left, right }) |builder| {
             try builder.drawText(.{ .id = 1, .font_id = 2, .size = 13, .origin = .zero(), .color = .rgba(1, 1, 1, 1), .text = "sibling borrowed 日本 text" });
@@ -106,7 +106,7 @@ test "compiled terminal paint complete text clusters wide cells styles cursor an
 }
 
 test "compiled terminal paint row atomic budgets and every builder failure prefix" {
-    const text = "a" ** 32760;
+    const text = strRepeat("a", 32760);
     const cells = [_]grid.TerminalCell{
         .{ .cp = 'a', .cluster = "a", .fg = .rgba(1, 1, 1, 1) }, .{ .cp = 'e', .cluster = "e\xcc\x81", .fg = .rgba(1, 0, 0, 1), .underline = true },
         .{ .cp = 0x2554, .fg = .rgba(1, 1, 1, 1) },              .{ .cp = 0x256d, .fg = .rgba(1, 1, 1, 1), .underline = true },
@@ -134,4 +134,16 @@ test "compiled terminal paint native measurement facts and bounded exact grid si
     }
     for ([_]usize{ 0, 1, 2, 96, 320, 400, std.math.maxInt(usize) }) |cols| for ([_]usize{ 0, 1, 2, 96, 320, 400, std.math.maxInt(usize) }) |rows| try exact(reference.clampGrid(cols, rows), grid.clampGridWithPolicy(cols, rows, observed));
     try std.testing.expect(calls[2] > 0);
+}
+
+/// Comptime string repetition; replaces the `**` operator removed in Zig 0.17.
+inline fn strRepeat(comptime s: []const u8, comptime n: usize) *const [s.len * n:0]u8 {
+    const rep_result = comptime blk: {
+        @setEvalBranchQuota(n * (s.len + 4) + 1000);
+        var buf: [s.len * n:0]u8 = undefined;
+        for (0..n) |i| @memcpy(buf[i * s.len ..][0..s.len], s);
+        const rep_final = buf;
+        break :blk rep_final;
+    };
+    return &rep_result;
 }

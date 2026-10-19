@@ -1358,9 +1358,47 @@ test "window chrome codec preserves every OS field and refuses damaged payloads"
 
 comptime {
     if (!std.mem.eql(u8, magic, "NSDKSJNL") or preamble_len != 16 or max_session_record_bytes != 1114112 or
-        @typeInfo(RecordKind).@"enum".fields.len != 7 or @intFromEnum(RecordKind.header) != 1 or
+        typeFields(@typeInfo(RecordKind).@"enum").len != 7 or @intFromEnum(RecordKind.header) != 1 or
         @intFromEnum(RecordKind.event) != 2 or @intFromEnum(RecordKind.effect) != 3 or
         @intFromEnum(RecordKind.checkpoint) != 4 or @intFromEnum(RecordKind.screenshot) != 5 or
         @intFromEnum(RecordKind.end) != 6 or @intFromEnum(RecordKind.window_chrome) != 7)
         @compileError("update the portable journal framing schema with the journal format");
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

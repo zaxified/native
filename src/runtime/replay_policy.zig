@@ -23,7 +23,7 @@ pub fn request(record: effects.EffectResultRecord) [256]u8 {
     for (words, 0..) |word, i| std.mem.writeInt(u64, bytes[24 + i * 8 ..][0..8], word, .little);
     bytes[240..248].* = .{ @intFromBool(record.file_rejected_admission), @intFromBool(record.file_exists), @intFromBool(record.video_playing), @intFromBool(record.video_buffering), @intFromBool(record.truncated), @intFromBool(std.mem.allEqual(u8, &record.credentials_salt, 0)), @intFromBool(std.mem.allEqual(u8, &record.credentials_digest, 0)), 0 };
     // Closed relational outcome count is a schema fact, not an admission verdict.
-    bytes[248] = @intCast(@typeInfo(effects.EffectDbOutcome).@"enum".fields.len);
+    bytes[248] = @intCast(typeFields(@typeInfo(effects.EffectDbOutcome).@"enum").len);
     return bytes;
 }
 // The native branch is retained for explicit Zig-core applications.
@@ -62,5 +62,43 @@ pub fn coordinate(policy: Policy, stage: Stage, a: u8, b: bool, c: bool) Action 
         .feed_error => if (a == 0) (if (b) .propagate else .drain) else if (a == 1) .effect_divergence else .unsupported,
         .verify => if (a != 0) .verify else .proceed,
         .end => if (a != 0) .chrome_divergence else .proceed,
+    };
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
     };
 }

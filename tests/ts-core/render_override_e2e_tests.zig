@@ -94,7 +94,7 @@ test "compiled override f32 composition clamp clipping and NaN equality match ev
     }
     next[0].opacity = 0.5;
     for (0..6) |axis| for (values) |value| {
-        if (builtin.mode != .ReleaseFast and !std.math.isFinite(value)) continue;
+        if (builtin.mode != .fast and !std.math.isFinite(value)) continue;
         next[0].transform = .{};
         switch (axis) {
             0 => next[0].transform.?.a = value,
@@ -111,7 +111,7 @@ test "compiled override f32 composition clamp clipping and NaN equality match ev
 
 const Storage = @import("render_cache_e2e_tests.zig").Storage;
 const frameEqual = @import("render_cache_e2e_tests.zig").frameEqual;
-var calls: [2]usize = .{0} ** 2;
+var calls: [2]usize = @splat(0);
 var first_request: ?[*]const u8 = null;
 var first_result: ?[*]u8 = null;
 var shared_buffers = true;
@@ -128,7 +128,7 @@ fn observed(request: []const u8, output: []u8) usize {
     return core.nativeWindowPolicy(request, output);
 }
 fn resetObserved() void {
-    calls = .{0} ** 2;
+    calls = @splat(0);
     first_request = null;
     first_result = null;
     shared_buffers = true;
@@ -222,7 +222,7 @@ test "override copied calls preserve borrowed committed model and native view by
     defer workspace.deinit();
     const request_pointer = workspace.request.ptr;
     const result_pointer = workspace.result.ptr;
-    var output = [_]Override{sentinel} ** 2;
+    var output = @as([2]Override, @splat(sentinel));
     _ = try policy.merge(&.{.{ .id = huge }}, &.{.{ .id = huge, .opacity = 0.5 }}, &output, core.nativeWindowPolicy, &workspace);
     var commands = [_]canvas.RenderCommand{command};
     _ = policy.applyAndDamage(&commands, &.{.{ .id = huge }}, output[0..1], &[_]policy.DamageEntry{}, core.nativeWindowPolicy, &workspace);

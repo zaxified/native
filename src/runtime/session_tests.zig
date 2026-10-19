@@ -22,7 +22,7 @@ const canvas_label = "session-canvas";
 
 const SessionModel = struct {
     count: u32 = 0,
-    body: [64]u8 = [_]u8{0} ** 64,
+    body: [64]u8 = @as([64]u8, @splat(0)),
     body_len: usize = 0,
     fetch_status: u16 = 0,
     line_count: u32 = 0,
@@ -39,7 +39,7 @@ const SessionModel = struct {
     /// types into the field and Escape-clears it: the journal records
     /// only the RAW click/type/Escape platform events, so replay must
     /// re-derive the same clear edit the recording's editor applied.
-    query: [32]u8 = [_]u8{0} ** 32,
+    query: [32]u8 = @as([32]u8, @splat(0)),
     query_len: usize = 0,
     query_anchor: usize = 0,
     query_focus: usize = 0,
@@ -47,7 +47,7 @@ const SessionModel = struct {
     /// A SECOND editable field's mirror: the direct-verb replay tests
     /// need two editors so a composition targeting one can prove it
     /// does not land on whichever field the session left focused.
-    name: [32]u8 = [_]u8{0} ** 32,
+    name: [32]u8 = @as([32]u8, @splat(0)),
     name_len: usize = 0,
     name_anchor: usize = 0,
     name_focus: usize = 0,
@@ -176,7 +176,7 @@ fn applyMirrorEdit(store: *[32]u8, len: *usize, anchor: *usize, focus: *usize, e
         .text = store[0..len.*],
         .selection = .{ .anchor = anchor.*, .focus = focus.* },
     }).apply(edit, &scratch) catch return;
-    var out = [_]u8{0} ** 32;
+    var out = @as([32]u8, @splat(0));
     const out_len = @min(next.text.len, out.len);
     std.mem.copyForwards(u8, out[0..out_len], next.text[0..out_len]);
     store.* = out;

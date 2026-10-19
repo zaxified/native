@@ -430,7 +430,7 @@ pub fn RuntimeWindowViews(comptime Runtime: type) type {
                 return;
             }
             var layout = ShellLayout.init(bounds, views);
-            var created: [app_manifest.max_shell_views_per_window]bool = [_]bool{false} ** app_manifest.max_shell_views_per_window;
+            var created: [app_manifest.max_shell_views_per_window]bool = @as([app_manifest.max_shell_views_per_window]bool, @splat(false));
             var created_count: usize = 0;
             while (created_count < views.len) {
                 var progressed = false;

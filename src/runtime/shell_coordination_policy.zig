@@ -4,7 +4,7 @@ const platform = @import("../platform/root.zig");
 const manifest = @import("app_manifest");
 pub const Policy = *const fn ([]const u8, []u8) usize;
 comptime {
-    if (manifest.max_shell_windows != 16 or manifest.max_shell_views_per_window != 128 or platform.max_windows != 16 or platform.max_views != 32 or platform.max_webviews != 16 or @typeInfo(platform.ViewKind).@"enum".fields.len != 19 or @intFromEnum(platform.ViewKind.webview) != 0 or @intFromEnum(platform.ViewKind.gpu_surface) != 17 or @intFromEnum(platform.ViewKind.progress_indicator) != 18 or @bitSizeOf(platform.WindowId) != 64 or @bitSizeOf(usize) > 64) @compileError("update shell coordination wire capacities");
+    if (manifest.max_shell_windows != 16 or manifest.max_shell_views_per_window != 128 or platform.max_windows != 16 or platform.max_views != 32 or platform.max_webviews != 16 or typeFields(@typeInfo(platform.ViewKind).@"enum").len != 19 or @intFromEnum(platform.ViewKind.webview) != 0 or @intFromEnum(platform.ViewKind.gpu_surface) != 17 or @intFromEnum(platform.ViewKind.progress_indicator) != 18 or @bitSizeOf(platform.WindowId) != 64 or @bitSizeOf(usize) > 64) @compileError("update shell coordination wire capacities");
 }
 pub const Mode = enum(u8) { scene, equal, apply, rollback, restore, bind, admission, presentation };
 pub const Program = struct {
@@ -135,4 +135,42 @@ pub fn presentation(policy: Policy, window: manifest.ShellWindow) struct { show:
         2 => .on_first_present,
         else => unreachable,
     } };
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

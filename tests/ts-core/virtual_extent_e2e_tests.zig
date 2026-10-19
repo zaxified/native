@@ -200,8 +200,8 @@ test "compiled extent hot queries use bounded scalar records and preserve borrow
     const owned = try std.testing.allocator.dupe(u8, borrowed);
     defer std.testing.allocator.free(owned);
     const Recorder = struct {
-        var counts = [_]usize{0} ** 16;
-        var bytes = [_]usize{0} ** 16;
+        var counts = @as([16]usize, @splat(0));
+        var bytes = @as([16]usize, @splat(0));
         var largest: usize = 0;
         fn call(request: []const u8, output: []u8) usize {
             if (request.len > 1 and request[0] == 10) {
@@ -212,8 +212,8 @@ test "compiled extent hot queries use bounded scalar records and preserve borrow
             return core.nativeWindowPolicy(request, output);
         }
     };
-    Recorder.counts = [_]usize{0} ** 16;
-    Recorder.bytes = [_]usize{0} ** 16;
+    Recorder.counts = @as([16]usize, @splat(0));
+    Recorder.bytes = @as([16]usize, @splat(0));
     var table = Table{ .policy = Recorder.call };
     _ = table.sync(.{ .id = 7, .item_count = 3000, .uniform_estimate = 10, .gap = 1 });
     try std.testing.expectEqual(@as(usize, 3), Recorder.counts[9]);
@@ -224,8 +224,8 @@ test "compiled extent hot queries use bounded scalar records and preserve borrow
     table.applyMeasurements(20, null, &rows);
     try std.testing.expectEqual(@as(usize, 1), Recorder.counts[1]);
     try std.testing.expectEqual(@as(usize, 64 + 2048 * 16), Recorder.bytes[1]);
-    Recorder.counts = [_]usize{0} ** 16;
-    Recorder.bytes = [_]usize{0} ** 16;
+    Recorder.counts = @as([16]usize, @splat(0));
+    Recorder.bytes = @as([16]usize, @splat(0));
     _ = table.sync(.{ .id = 7, .item_count = 3000, .uniform_estimate = 10, .gap = 1 });
     _ = canvas.virtualVariableListRange(.{ .item_count = 3000, .viewport_extent = 100, .scroll_offset = 1234, .overscan = 3 }, &table);
     try std.testing.expectEqual(@as(usize, 0), Recorder.counts[1]);

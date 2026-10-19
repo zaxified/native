@@ -145,8 +145,9 @@ pub const ChildPlan = struct {
         if (result.action() == .done) {
             if (written != self.result.len or result.index() > self.count) @panic("invalid layout child program length");
             absent(&result.bytes, 12, 32);
-            var scratch = std.heap.stackFallback(256, std.heap.page_allocator);
-            const validator_allocator = scratch.get();
+            var scratch_buf: [256]u8 = undefined;
+            var scratch = std.heap.BufferFirstAllocator.init(&scratch_buf, std.heap.page_allocator);
+            const validator_allocator = scratch.allocator();
             const seen = validator_allocator.alloc(bool, self.count) catch @panic("layout identity validation allocation failed");
             defer validator_allocator.free(seen);
             @memset(seen, false);

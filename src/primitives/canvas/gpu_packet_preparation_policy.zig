@@ -28,7 +28,7 @@ const Facts = struct {
         try self.appendWord(@as(u32, @bitCast(value)));
     }
     fn record(self: *Facts, value: anytype) !void {
-        inline for (@typeInfo(@TypeOf(value)).@"struct".fields) |field| try self.scalar(@field(value, field.name));
+        inline for (typeFields(@typeInfo(@TypeOf(value)).@"struct")) |field| try self.scalar(@field(value, field.name));
     }
     fn optionalRect(self: *Facts, value: anytype) !void {
         try self.appendWord(@intFromBool(value != null));
@@ -144,7 +144,7 @@ const Facts = struct {
     }
 };
 fn header(facts: *Facts, mode: u8, count: usize, baseline: usize, unique: bool) !void {
-    try facts.bytes.appendSlice(allocator, &([_]u8{0} ** 32));
+    try facts.bytes.appendSlice(allocator, &(@as([32]u8, @splat(0))));
     facts.bytes.items[0..4].* = .{ 71, 1, mode, 0 };
     put(facts.bytes.items, 4, count);
     put(facts.bytes.items, 8, baseline);
@@ -322,4 +322,42 @@ pub fn gatherMaterialized(commands: []const canvas.RenderCommand, bounds: @impor
         @memcpy(storage[0..packet.commands.len], packet.commands);
     }
     return packet.commands.len;
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

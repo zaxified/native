@@ -649,7 +649,7 @@ fn readU64(bytes: []const u8, at: usize) u64 {
 test "service host binding is lazy and shuts down without spawning" {
     const Registry = struct {
         pub const protocol_version: u8 = 3;
-        pub const contract_fingerprint = [_]u8{0} ** 32;
+        pub const contract_fingerprint = @as([32]u8, @splat(0));
         pub const Operation = struct { name: []const u8, index: u16, deadline_ms: ?u32, cancellable: bool, streaming: bool, in_flight: u8 };
         pub fn indexOf(name: []const u8) ?u16 {
             return if (std.mem.eql(u8, name, "fixture.echo")) 0 else null;
@@ -670,7 +670,7 @@ test "service host binding is lazy and shuts down without spawning" {
 test "service cancellation markers live under the writable service cwd" {
     const Registry = struct {
         pub const protocol_version: u8 = 3;
-        pub const contract_fingerprint = [_]u8{0} ** 32;
+        pub const contract_fingerprint = @as([32]u8, @splat(0));
         pub const Operation = struct { name: []const u8, index: u16, deadline_ms: ?u32, cancellable: bool, streaming: bool, in_flight: u8 };
         pub fn indexOf(_: []const u8) ?u16 {
             return null;

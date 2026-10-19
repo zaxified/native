@@ -8,14 +8,14 @@ const view_model = @import("view.zig");
 const widget_runtime = @import("canvas_widget_runtime.zig");
 pub const Policy = *const fn ([]const u8, []u8) usize;
 comptime {
-    const kinds = @typeInfo(canvas.WidgetKind).@"enum".fields;
+    const kinds = typeFields(@typeInfo(canvas.WidgetKind).@"enum");
     if (kinds.len != 63 or @intFromEnum(canvas.WidgetKind.accordion) != 14) @compileError("update motion kind wire");
     const easings = .{ "linear", "standard", "emphasized", "spring" };
-    for (@typeInfo(canvas.Easing).@"enum".fields, easings, 0..) |field, name, i| {
+    for (typeFields(@typeInfo(canvas.Easing).@"enum"), easings, 0..) |field, name, i| {
         if (!std.mem.eql(u8, field.name, name) or field.value != i) @compileError("update motion easing wire");
     }
     const loops = .{ "none", "ping_pong", "wrap" };
-    for (@typeInfo(canvas.CanvasRenderAnimationLoop).@"enum".fields, loops, 0..) |field, name, i| {
+    for (typeFields(@typeInfo(canvas.CanvasRenderAnimationLoop).@"enum"), loops, 0..) |field, name, i| {
         if (!std.mem.eql(u8, field.name, name) or field.value != i) @compileError("update motion loop wire");
     }
     if (limits.max_canvas_widget_nodes_per_view > 1024 or limits.max_canvas_widget_disclosure_flips_per_view > 8 or limits.max_canvas_widget_disclosure_moves_per_view > 256 or limits.max_canvas_widget_drag_layout_motions_per_view > 64 or limits.max_canvas_widget_loop_animations_per_view > 64) @compileError("update motion capacity wire");
@@ -235,4 +235,42 @@ fn readWide(bytes: []const u8) u64 {
 }
 fn readFloat(bytes: []const u8) f32 {
     return @bitCast(readWord(bytes));
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

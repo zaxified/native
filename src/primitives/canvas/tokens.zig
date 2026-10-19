@@ -86,7 +86,7 @@ pub const ThemePack = enum {
     /// unknown names so callers can raise their own teaching error with
     /// the offending string and the valid list.
     pub fn fromName(name: []const u8) ?ThemePack {
-        inline for (@typeInfo(ThemePack).@"enum".fields) |field| {
+        inline for (typeFields(@typeInfo(ThemePack).@"enum")) |field| {
             if (std.mem.eql(u8, name, field.name)) return @field(ThemePack, field.name);
         }
         return null;
@@ -1992,10 +1992,48 @@ pub const DesignTokens = struct {
 
 fn applyFlatTokenOverrides(comptime Token: type, base: Token, overrides: anytype) Token {
     var next = base;
-    inline for (@typeInfo(@TypeOf(overrides)).@"struct".fields) |field| {
+    inline for (typeFields(@typeInfo(@TypeOf(overrides)).@"struct")) |field| {
         if (@field(overrides, field.name)) |value| {
             @field(next, field.name) = value;
         }
     }
     return next;
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

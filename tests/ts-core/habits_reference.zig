@@ -38,7 +38,7 @@ pub const Filter = enum { all, active };
 
 pub const Habit = struct {
     id: u32,
-    name_storage: [max_habit_name]u8 = [_]u8{0} ** max_habit_name,
+    name_storage: [max_habit_name]u8 = @as([max_habit_name]u8, @splat(0)),
     name_len: usize = 0,
     streak: u32 = 0,
 

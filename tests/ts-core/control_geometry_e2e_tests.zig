@@ -86,7 +86,7 @@ test "compiled control geometry preserves scrollbar axes corner gaps and static 
         widget.scroll_axes = axes;
         for ([_]c.ScrollAxis{ .vertical, .horizontal }) |axis| try exact(scroll.widgetScrollAxisMetricsForWidget(widget, t, axis), scroll.widgetScrollAxisMetricsForWidget(widget, owned(t), axis));
     }
-    const many = [_]c.Widget{.{ .kind = .text, .frame = .init(1, 120, 300, 80) }} ** 33;
+    const many = @as([33]c.Widget, @splat(.{ .kind = .text, .frame = .init(1, 120, 300, 80) }));
     widget.children = &many;
     try exact(scroll.widgetScrollMetricsForWidget(widget, t), scroll.widgetScrollMetricsForWidget(widget, owned(t)));
     widget.layout.virtualized = true;

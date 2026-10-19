@@ -2551,7 +2551,7 @@ test "built-in component catalog covers house component set" {
         "Toggle Group",
         "Tooltip",
     };
-    const enum_len = @typeInfo(BuiltinComponentKind).@"enum".fields.len;
+    const enum_len = typeFields(@typeInfo(BuiltinComponentKind).@"enum").len;
     try std.testing.expectEqual(enum_len, builtinComponentCount());
     try std.testing.expectEqual(enum_len, builtin_component_names.len);
     try std.testing.expectEqual(expected_names.len, builtin_component_names.len);
@@ -2559,7 +2559,7 @@ test "built-in component catalog covers house component set" {
         try std.testing.expectEqualStrings(expected, actual);
     }
 
-    var seen = [_]bool{false} ** enum_len;
+    var seen = @as([enum_len]bool, @splat(false));
     for (builtin_component_kinds, 0..) |kind, index| {
         const descriptor = builtinComponentDescriptor(kind);
         try std.testing.expectEqual(kind, descriptor.kind);
@@ -5217,4 +5217,42 @@ test "search fields clip an overflowing value and keep chrome outside the clip" 
     try std.testing.expect(text_index.? < caret_index.?);
     try std.testing.expect(caret_index.? < pop_index.?);
     try std.testing.expect(pop_index.? < clear_transform_index.?);
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

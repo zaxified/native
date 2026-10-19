@@ -121,7 +121,7 @@ fn restored(native: *const reference.Model) !void {
     var expected = native.*;
     // The retained reference uses checked += in safety modes. Compare its
     // transition below overflow; qualify its ReleaseFast wrap separately.
-    if (expected.fetches < std.math.maxInt(u32) or @import("builtin").mode == .ReleaseFast) {
+    if (expected.fetches < std.math.maxInt(u32) or @import("builtin").mode == .fast) {
         try step(&expected, &fx, .load_more, .load_more);
     } else {
         Host.dispatch(&fx, .load_more);

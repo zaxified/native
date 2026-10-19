@@ -192,7 +192,7 @@ pub const Query = struct { prefix: f32, gap: f32, offset: f32 };
 pub fn query(policy: Policy, table: anytype, index: usize, mode: u8) Query {
     const builtin = @import("builtin");
     var request = header(48, 13);
-    request[3] = mode | @as(u8, if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) 4 else 0);
+    request[3] = mode | @as(u8, if (builtin.mode == .debug or builtin.mode == .safe) 4 else 0);
     putInt(&request, 8, table.item_count);
     putInt(&request, 16, index);
     putInt(&request, 24, table.index_base);
@@ -242,7 +242,7 @@ pub fn scalar(policy: Policy, estimate: f32, delta: f32, gap: f32, count: usize,
 pub fn search(policy: Policy, table: anytype, offset: f32) usize {
     const builtin = @import("builtin");
     var request = header(40, 12);
-    request[3] = if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) 1 else 0;
+    request[3] = if (builtin.mode == .debug or builtin.mode == .safe) 1 else 0;
     putInt(&request, 8, table.item_count);
     putFloat(&request, 32, offset);
     var result: [32]u8 = undefined;
@@ -263,7 +263,7 @@ pub fn search(policy: Policy, table: anytype, offset: f32) usize {
     }
 }
 fn header(comptime length: usize, operation: u8) [length]u8 {
-    var request = [_]u8{0} ** length;
+    var request = @as([length]u8, @splat(0));
     request[0] = 10;
     request[1] = operation;
     request[2] = surface.anchorFlags(0, false) >> 3;

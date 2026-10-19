@@ -12,7 +12,7 @@ pub const Family = enum(u8) { button, text_input, selection, surface, component,
 const table_names = .{ "button_default", "button_primary", "button_secondary", "button_outline", "button_ghost", "button_destructive", "toggle_button", "accordion", "alert", "bubble", "card", "dialog", "drawer", "sheet", "select", "input", "text_field", "search_field", "combobox", "textarea", "list_item", "menu_item", "data_cell", "tabs", "segmented_control", "button_group", "checkbox", "radio", "switch_control", "slider", "progress", "scrollbar", "panel", "resizable", "popover", "menu_surface", "dropdown_menu", "tooltip", "avatar", "badge", "separator", "skeleton", "spinner" };
 comptime {
     const names = .{ "stack", "row", "column", "grid", "data_grid", "table", "scroll_view", "list", "breadcrumb", "button_group", "pagination", "radio_group", "tabs", "toggle_group", "accordion", "bubble", "resizable", "alert", "card", "dialog", "drawer", "sheet", "panel", "popover", "menu_surface", "dropdown_menu", "text", "icon", "image", "avatar", "badge", "button", "toggle_button", "icon_button", "select", "input", "text_field", "search_field", "combobox", "textarea", "tooltip", "menu_item", "list_item", "data_row", "data_cell", "status_bar", "segmented_control", "checkbox", "radio", "switch_control", "toggle", "slider", "progress", "separator", "skeleton", "spinner", "chart", "split", "split_divider", "tree", "input_group", "media_surface", "terminal" };
-    const actual = @typeInfo(widget_model.WidgetKind).@"enum".fields;
+    const actual = typeFields(@typeInfo(widget_model.WidgetKind).@"enum");
     if (actual.len != names.len) @compileError("update control appearance kind wire");
     for (names, actual) |name, field| if (!std.mem.eql(u8, name, field.name)) @compileError("control appearance kind wire changed");
 }
@@ -139,4 +139,42 @@ fn numericFlags() u32 {
     var negative_zero: f32 = -0.0;
     std.mem.doNotOptimizeAway(&negative_zero);
     return if (@as(u32, @bitCast(@max(0, negative_zero))) == 0x80000000) 4 else 0;
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

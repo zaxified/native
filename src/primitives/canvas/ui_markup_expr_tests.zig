@@ -313,7 +313,7 @@ test "division by zero and overflow are loud, defined failures" {
 test "huge literals are rejected at parse time" {
     try expectParseFail("123456789012345678901234567890", expr.integer_literal_overflow_message);
     // A float literal past f32's range never becomes inf.
-    const big = "9" ** 60 ++ ".0";
+    const big = strRepeat("9", 60) ++ ".0";
     try expectParseFail(big, expr.number_literal_range_message);
 }
 
@@ -334,11 +334,11 @@ test "complexity bounds are taught one past" {
 
     // Depth: 16 nested parens parse, 17 teach.
     {
-        const at = "(" ** (expr.max_expression_depth - 1) ++ "1" ++ ")" ** (expr.max_expression_depth - 1);
+        const at = strRepeat("(", expr.max_expression_depth - 1) ++ "1" ++ strRepeat(")", expr.max_expression_depth - 1);
         var tree: expr.ExprTree = .{};
         var diagnostic: expr.Diagnostic = .{};
         try testing.expect(expr.parse(at, &tree, &diagnostic));
-        const past = "(" ** expr.max_expression_depth ++ "1" ++ ")" ** expr.max_expression_depth;
+        const past = strRepeat("(", expr.max_expression_depth) ++ "1" ++ strRepeat(")", expr.max_expression_depth);
         try expectParseFail(past, expr.expression_too_deep_message);
     }
 
@@ -764,7 +764,7 @@ test "expression bounds hold inside markup attributes end to end" {
 
     // One past the depth bound inside an attribute value, through the
     // validator (what native markup check runs)...
-    const deep = "(" ** expr.max_expression_depth ++ "1" ++ ")" ** expr.max_expression_depth;
+    const deep = strRepeat("(", expr.max_expression_depth) ++ "1" ++ strRepeat(")", expr.max_expression_depth);
     const source = try std.fmt.allocPrint(arena, "<row gap=\"{{{s}}}\" />", .{deep});
     var parser = markup.Parser.init(arena, source);
     const info = markup.validate(try parser.parse()) orelse return error.TestUnexpectedResult;
@@ -776,4 +776,16 @@ test "expression bounds hold inside markup attributes end to end" {
     var ui = ParityUi.init(arena);
     try testing.expectError(error.MarkupBuild, view.build(&ui, &model));
     try testing.expectEqualStrings(expr.expression_too_deep_message, view.diagnostic.message);
+}
+
+/// Comptime string repetition; replaces the `**` operator removed in Zig 0.17.
+inline fn strRepeat(comptime s: []const u8, comptime n: usize) *const [s.len * n:0]u8 {
+    const rep_result = comptime blk: {
+        @setEvalBranchQuota(n * (s.len + 4) + 1000);
+        var buf: [s.len * n:0]u8 = undefined;
+        for (0..n) |i| @memcpy(buf[i * s.len ..][0..s.len], s);
+        const rep_final = buf;
+        break :blk rep_final;
+    };
+    return &rep_result;
 }

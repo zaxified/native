@@ -100,8 +100,9 @@ fn run(policy: Policy, input: []const u8) Program {
     return result;
 }
 fn textProgram(policy: Policy, mode: u8, context: Family, value: []const u8) Program {
-    var storage = std.heap.stackFallback(4096, std.heap.page_allocator);
-    var writer = std.Io.Writer.Allocating.init(storage.get());
+    var storage_buf: [4096]u8 = undefined;
+    var storage = std.heap.BufferFirstAllocator.init(&storage_buf, std.heap.page_allocator);
+    var writer = std.Io.Writer.Allocating.init(storage.allocator());
     defer writer.deinit();
     writer.writer.writeAll(&.{ 89, 1, mode, @intFromEnum(context), 0, 0, 0, 0 }) catch @panic("builtin transport allocation failed");
     var length: [8]u8 = undefined;

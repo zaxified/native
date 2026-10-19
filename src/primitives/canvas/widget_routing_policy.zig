@@ -9,7 +9,7 @@ pub const Policy = @import("surface_layout_policy.zig").Policy;
 const missing = std.math.maxInt(u32);
 const roles = [_]widgets.WidgetRole{ .none, .group, .text, .link, .image, .button, .textbox, .tooltip, .dialog, .menu, .menuitem, .list, .listitem, .row, .grid, .gridcell, .tab, .checkbox, .radio, .radiogroup, .switch_control, .slider, .progressbar, .chart, .tree, .treeitem, .separator };
 comptime {
-    if (roles.len != @typeInfo(widgets.WidgetRole).@"enum".fields.len) @compileError("update routing role codes");
+    if (roles.len != typeFields(@typeInfo(widgets.WidgetRole).@"enum").len) @compileError("update routing role codes");
 }
 pub fn owner(layout: anytype) ?Policy {
     const T = switch (@typeInfo(@TypeOf(layout))) {
@@ -132,4 +132,42 @@ pub fn query(layout: anytype, policy: Policy, comptime op: u8, param: u8, subjec
         };
     }
     return result;
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

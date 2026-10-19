@@ -21,7 +21,7 @@ pub const Plan = struct {
 /// copied before recursion; the enclosing view/cycle owns arena collection.
 pub fn plan(policy: Policy, count: usize, columns: usize, overscan: usize, content: geometry.RectF, gap: f32, item_extent: f32, measured_extent: f32, scroll: f32, virtual: bool) Plan {
     var request: [76]u8 = undefined;
-    request[0..4].* = .{ 4, 0, (if (virtual) @as(u8, 1) else 0) | (surface.anchorFlags(0, false) >> 2) | (if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) @as(u8, 4) else 0), 0 };
+    request[0..4].* = .{ 4, 0, (if (virtual) @as(u8, 1) else 0) | (surface.anchorFlags(0, false) >> 2) | (if (builtin.mode == .debug or builtin.mode == .safe) @as(u8, 4) else 0), 0 };
     for ([_]usize{ count, columns, overscan }, 0..) |value, i| std.mem.writeInt(u64, request[4 + i * 8 ..][0..8], value, .little);
     const values = [_]f32{ content.x, content.y, content.width, content.height, gap, item_extent, measured_extent, scroll, @floatFromInt(count), @floatFromInt(columns), @floatFromInt(count -| 1), @floatFromInt(columns -| 1) };
     for (values, 0..) |value, i| std.mem.writeInt(u32, request[28 + i * 4 ..][0..4], @bitCast(value), .little);

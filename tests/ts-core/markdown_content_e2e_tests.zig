@@ -85,8 +85,8 @@ test "compiled Markdown image discovery preserves every canonical source and out
 
 test "compiled Markdown hostile capacity fallback preserves the complete native tree" {
     _ = core.initialModel();
-    const patterns = [_][]const u8{ "- item\n", "# heading\n\n", "a ", "[", "<", "![", "<!--", "https://example.test/" ++ ")" ** 40 ++ " ", "<b>x</b>", "<details>\n<summary>s</summary>\n", "<div align=center>\n", "| a | b |\n" };
-    const expanded = [_]bool{true} ** 16;
+    const patterns = [_][]const u8{ "- item\n", "# heading\n\n", "a ", "[", "<", "![", "<!--", "https://example.test/" ++ strRepeat(")", 40) ++ " ", "<b>x</b>", "<details>\n<summary>s</summary>\n", "<div align=center>\n", "| a | b |\n" };
+    const expanded = @as([16]bool, @splat(true));
     for (patterns) |pattern| {
         const count: usize = if (std.mem.eql(u8, pattern, "a ")) 6000 else 100;
         const text = try std.testing.allocator.alloc(u8, pattern.len * count + "\n\n# retained tail\n\x00\xff literal tail".len);
@@ -111,7 +111,7 @@ test "compiled Markdown complete document and deterministic mixed grammar match 
     _ = core.initialModel();
     const document = try std.Io.Dir.cwd().readFileAlloc(std.testing.io, "src/primitives/canvas/testdata/markdown_document.md", std.testing.allocator, .limited(1024 * 1024));
     defer std.testing.allocator.free(document);
-    const expanded = [_]bool{true} ** 16;
+    const expanded = @as([16]bool, @splat(true));
     const options: Md.Options = .{ .images = &mappings, .on_link = Ui.linkMsg(.open_url), .on_details = Md.detailsMsg(.toggle_details), .details_expanded = &expanded, .issue_link_base = "issue://\x00\xff/" };
     try compare(document, options);
     const fragments = [_][]const u8{ "\n", "\x00\xff\xc0", "**bold** ", "*", "`code` ", "<!-- hidden -->", "[go](u)", "![alt](asset)", "<a href='raw&amp;u'>", "</a>", "<b>", "</b>", "&#x1f600;", "<script>", "</script>", "<code>", "</code>", "\n# Title\n", "\n- item\n", "\n> quote\n", "\n<div align=center>\n", "\n</div>\n", "\n| a | b |\n|:---|---:|\n", "\n<details>\n<summary>More</summary>\n", "\n</details>\n", "\n```ts\n", "\n```\n", "https://example.test/path)). ", "#0005 ", "[ref]: target\n" };
@@ -139,7 +139,7 @@ test "compiled Markdown recipe validation and retained ownership have no native 
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const source = "[go](raw\x00\xff)\n\n- item\n\n```ts\nconst x = 1;\n```";
-    var request = [_]u8{0} ** (24 + source.len);
+    var request = @as([24 + source.len]u8, @splat(0));
     request[0..4].* = .{ 22, 0, 1, 0 };
     std.mem.writeInt(u32, request[4..8], source.len, .little);
     @memcpy(request[24..], source);
@@ -174,4 +174,16 @@ test "compiled Markdown recipe validation and retained ownership have no native 
     failed.markdown_content_policy = Broken.policy;
     const root = Md.view(&failed, "# retained source", .{});
     try std.testing.expectError(error.OutOfMemory, failed.finalize(root));
+}
+
+/// Comptime string repetition; replaces the `**` operator removed in Zig 0.17.
+inline fn strRepeat(comptime s: []const u8, comptime n: usize) *const [s.len * n:0]u8 {
+    const rep_result = comptime blk: {
+        @setEvalBranchQuota(n * (s.len + 4) + 1000);
+        var buf: [s.len * n:0]u8 = undefined;
+        for (0..n) |i| @memcpy(buf[i * s.len ..][0..s.len], s);
+        const rep_final = buf;
+        break :blk rep_final;
+    };
+    return &rep_result;
 }

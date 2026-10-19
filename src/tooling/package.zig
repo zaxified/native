@@ -27,7 +27,7 @@ pub const PackageTarget = enum {
     android,
 
     pub fn parse(value: []const u8) ?PackageTarget {
-        inline for (@typeInfo(PackageTarget).@"enum".fields) |field| {
+        inline for (typeFields(@typeInfo(PackageTarget).@"enum")) |field| {
             if (std.mem.eql(u8, value, field.name)) return @enumFromInt(field.value);
         }
         return null;
@@ -3855,7 +3855,7 @@ test "package refuses an exclude against a resolved Chromium engine" {
 /// carries. The COFF machine field stays zero, which the arch sniff
 /// reads as x64.
 fn testWebLayerPeBytes() [0x80 + "WebView2Loader.dll".len * 2]u8 {
-    var bytes = [_]u8{0} ** (0x80 + "WebView2Loader.dll".len * 2);
+    var bytes = @as([0x80 + "WebView2Loader.dll".len * 2]u8, @splat(0));
     bytes[0] = 'M';
     bytes[1] = 'Z';
     std.mem.writeInt(u32, bytes[0x3c..0x40], 0x40, .little);
@@ -3871,7 +3871,7 @@ fn testWebLayerPeBytes() [0x80 + "WebView2Loader.dll".len * 2]u8 {
 /// subsystem tests: MZ + PE + a COFF header declaring a 240-byte
 /// optional header, with the Subsystem field set as asked.
 fn testSubsystemPeBytes(subsystem: u16) [0x200]u8 {
-    var bytes = [_]u8{0} ** 0x200;
+    var bytes = @as([0x200]u8, @splat(0));
     bytes[0] = 'M';
     bytes[1] = 'Z';
     std.mem.writeInt(u32, bytes[0x3c..0x40], 0x40, .little);
@@ -3930,7 +3930,7 @@ test "a PE offset past the header ceiling proves nothing and allocates nothing" 
     try cwd.deleteTree(std.testing.io, root);
     defer cwd.deleteTree(std.testing.io, root) catch {};
     try cwd.createDirPath(std.testing.io, root);
-    var bytes = [_]u8{0} ** 0x40;
+    var bytes = @as([0x40]u8, @splat(0));
     bytes[0] = 'M';
     bytes[1] = 'Z';
     std.mem.writeInt(u32, bytes[0x3c..0x40], 8 * 1024 * 1024, .little);
@@ -4566,4 +4566,42 @@ test "android artifact carries launcher mipmaps and references them" {
     const manifest = try readPath(gpa, std.testing.io, root ++ "/demo-android/AndroidManifest.xml");
     defer gpa.free(manifest);
     try std.testing.expect(std.mem.indexOf(u8, manifest, "android:icon=\"@mipmap/ic_launcher\"") != null);
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

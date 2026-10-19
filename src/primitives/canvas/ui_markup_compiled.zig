@@ -104,7 +104,7 @@ fn CompiledMarkupEngine(comptime ModelT: type, comptime MsgT: type, comptime res
             comptime {
                 if (fragment_source.len == 0) @compileError("this compiled markup view has no embedded source baseline - only CompiledMarkupView / CompiledMarkupImports fragments can register with the fragment watch");
             }
-            if (comptime builtin.mode != .Debug) return .{};
+            if (comptime builtin.mode != .debug) return .{};
             return .{
                 .key = fragmentKey(),
                 .path = path,
@@ -183,7 +183,7 @@ fn CompiledMarkupEngine(comptime ModelT: type, comptime MsgT: type, comptime res
             // parity-proven, so pixels and structural ids match until the
             // edit itself changes them; release builds compile this
             // branch out entirely.
-            if (comptime builtin.mode == .Debug) {
+            if (comptime builtin.mode == .debug) {
                 if (ui.markup_fragment_host) |host| {
                     if (host.override(host.context, fragmentKey())) |override_ptr| {
                         const live_document: *const markup.MarkupDocument = @ptrCast(@alignCast(override_ptr));
@@ -708,7 +708,7 @@ fn CompiledMarkupEngine(comptime ModelT: type, comptime MsgT: type, comptime res
             if (resolved.consumed.*) return runtimeFail(Ui.Node, ui);
             resolved.consumed.* = true;
             var range: Range = undefined;
-            inline for (@typeInfo(Range).@"struct".fields) |field| {
+            inline for (typeFields(@typeInfo(Range).@"struct")) |field| {
                 const source = @field(resolved.range, field.name);
                 @field(range, field.name) = switch (@typeInfo(field.type)) {
                     .int => @intCast(source),
@@ -1059,7 +1059,7 @@ fn CompiledMarkupEngine(comptime ModelT: type, comptime MsgT: type, comptime res
                 @setEvalBranchQuota(10_000);
                 const expression = markup.parseMessageExpression(raw) orelse fail(node, markup.markdown_on_link_message);
                 if (expression.payload.len != 0) fail(node, markup.markdown_on_link_message);
-                for (@typeInfo(MsgT).@"union".fields) |field| {
+                for (typeFields(@typeInfo(MsgT).@"union")) |field| {
                     if (field.type == []const u8 and std.mem.eql(u8, field.name, expression.tag)) {
                         return Ui.linkMsg(@field(std.meta.Tag(MsgT), field.name));
                     }
@@ -1073,7 +1073,7 @@ fn CompiledMarkupEngine(comptime ModelT: type, comptime MsgT: type, comptime res
                 @setEvalBranchQuota(10_000);
                 const expression = markup.parseMessageExpression(raw) orelse fail(node, markup.markdown_on_details_message);
                 if (expression.payload.len != 0) fail(node, markup.markdown_on_details_message);
-                for (@typeInfo(MsgT).@"union".fields) |field| {
+                for (typeFields(@typeInfo(MsgT).@"union")) |field| {
                     if ((field.type == usize or field.type == i64) and std.mem.eql(u8, field.name, expression.tag)) {
                         return Md.detailsMsg(@field(std.meta.Tag(MsgT), field.name));
                     }
@@ -1960,13 +1960,13 @@ fn CompiledMarkupEngine(comptime ModelT: type, comptime MsgT: type, comptime res
         fn eachInfo(comptime each: []const u8) ?EachInfo {
             comptime {
                 @setEvalBranchQuota(10_000);
-                for (@typeInfo(ModelT).@"struct".fields) |field| {
+                for (typeFields(@typeInfo(ModelT).@"struct")) |field| {
                     if (!std.mem.eql(u8, field.name, each)) continue;
                     if (interpreter.sliceElement(field.type)) |Element| {
                         return .{ .Item = Element, .kind = .field, .name = field.name };
                     }
                 }
-                for (@typeInfo(ModelT).@"struct".decls) |decl| {
+                for (typeDecls(@typeInfo(ModelT).@"struct")) |decl| {
                     if (!std.mem.eql(u8, decl.name, each)) continue;
                     const DeclType = @TypeOf(@field(ModelT, decl.name));
                     if (interpreter.sliceElement(DeclType)) |Element| {
@@ -2491,7 +2491,7 @@ fn CompiledMarkupEngine(comptime ModelT: type, comptime MsgT: type, comptime res
         fn inputConstructor(comptime tag: []const u8) ?Ui.InputMsgFn {
             comptime {
                 @setEvalBranchQuota(10_000);
-                for (@typeInfo(MsgT).@"union".fields) |field| {
+                for (typeFields(@typeInfo(MsgT).@"union")) |field| {
                     if (field.type == canvas.TextInputEvent and std.mem.eql(u8, field.name, tag)) {
                         return Ui.inputMsg(@field(std.meta.Tag(MsgT), field.name));
                     }
@@ -2509,7 +2509,7 @@ fn CompiledMarkupEngine(comptime ModelT: type, comptime MsgT: type, comptime res
         fn scrollConstructor(comptime tag: []const u8) ?Ui.ScrollMsgFn {
             comptime {
                 @setEvalBranchQuota(10_000);
-                for (@typeInfo(MsgT).@"union".fields) |field| {
+                for (typeFields(@typeInfo(MsgT).@"union")) |field| {
                     if (field.type == canvas.ScrollState and std.mem.eql(u8, field.name, tag)) {
                         return Ui.scrollMsg(@field(std.meta.Tag(MsgT), field.name));
                     }
@@ -2528,7 +2528,7 @@ fn CompiledMarkupEngine(comptime ModelT: type, comptime MsgT: type, comptime res
         fn terminalConstructor(comptime tag: []const u8) ?Ui.TerminalMsgFn {
             comptime {
                 @setEvalBranchQuota(10_000);
-                for (@typeInfo(MsgT).@"union".fields) |field| {
+                for (typeFields(@typeInfo(MsgT).@"union")) |field| {
                     if (field.type == canvas.TerminalState and std.mem.eql(u8, field.name, tag)) {
                         return Ui.terminalMsg(@field(std.meta.Tag(MsgT), field.name));
                     }
@@ -2549,7 +2549,7 @@ fn CompiledMarkupEngine(comptime ModelT: type, comptime MsgT: type, comptime res
         fn legacyScrollTag(comptime tag: []const u8) bool {
             comptime {
                 @setEvalBranchQuota(10_000);
-                for (@typeInfo(MsgT).@"union".fields) |field| {
+                for (typeFields(@typeInfo(MsgT).@"union")) |field| {
                     if (interpreter.declaredLegacyScrollStateRecord(field.type) and std.mem.eql(u8, field.name, tag)) {
                         return true;
                     }
@@ -2561,7 +2561,7 @@ fn CompiledMarkupEngine(comptime ModelT: type, comptime MsgT: type, comptime res
         fn resizeConstructor(comptime tag: []const u8) ?Ui.ValueMsgFn {
             comptime {
                 @setEvalBranchQuota(10_000);
-                for (@typeInfo(MsgT).@"union".fields) |field| {
+                for (typeFields(@typeInfo(MsgT).@"union")) |field| {
                     if (field.type == f32 and std.mem.eql(u8, field.name, tag)) {
                         return Ui.valueMsg(@field(std.meta.Tag(MsgT), field.name));
                     }
@@ -2584,7 +2584,7 @@ fn CompiledMarkupEngine(comptime ModelT: type, comptime MsgT: type, comptime res
         fn valueConstructor(comptime tag: []const u8) ?Ui.ValueMsgFn {
             comptime {
                 @setEvalBranchQuota(10_000);
-                for (@typeInfo(MsgT).@"union".fields) |field| {
+                for (typeFields(@typeInfo(MsgT).@"union")) |field| {
                     const class = interpreter.valueArmClass(field.type) orelse continue;
                     if (!std.mem.eql(u8, field.name, tag)) continue;
                     return switch (class) {
@@ -2599,7 +2599,7 @@ fn CompiledMarkupEngine(comptime ModelT: type, comptime MsgT: type, comptime res
         fn msgTagIndex(comptime tag: []const u8) ?usize {
             comptime {
                 @setEvalBranchQuota(10_000);
-                for (@typeInfo(MsgT).@"union".fields, 0..) |field, index| {
+                for (typeFields(@typeInfo(MsgT).@"union"), 0..) |field, index| {
                     if (std.mem.eql(u8, field.name, tag)) return index;
                 }
                 return null;
@@ -2608,7 +2608,7 @@ fn CompiledMarkupEngine(comptime ModelT: type, comptime MsgT: type, comptime res
 
         fn constructMessage(comptime node: markup.MarkupNode, comptime expression: markup.MessageExpression, comptime entries: []const ScopeEntry, ui: *Ui, model: *const ModelT, scope: anytype) MsgT {
             const tag_index = comptime (msgTagIndex(expression.tag) orelse fail(node, "unknown message tag"));
-            const field = comptime @typeInfo(MsgT).@"union".fields[tag_index];
+            const field = comptime typeFields(@typeInfo(MsgT).@"union")[tag_index];
             if (comptime (field.type == void)) {
                 comptime {
                     if (expression.payload.len > 0) fail(node, "message does not take a payload");
@@ -2628,7 +2628,7 @@ fn CompiledMarkupEngine(comptime ModelT: type, comptime MsgT: type, comptime res
                 if (expression.payload.len == 0) fail(node, markup.on_drag_payload_message);
             }
             const tag_index = comptime (msgTagIndex(expression.tag) orelse fail(node, markup.on_drag_payload_message));
-            const field = comptime @typeInfo(MsgT).@"union".fields[tag_index];
+            const field = comptime typeFields(@typeInfo(MsgT).@"union")[tag_index];
             comptime {
                 if (!interpreter.declaredWidgetDragDropRecord(field.type)) fail(node, markup.on_drag_payload_message);
             }
@@ -2957,7 +2957,7 @@ fn CompiledMarkupEngine(comptime ModelT: type, comptime MsgT: type, comptime res
                 if (@typeInfo(T) != .@"struct") return null;
                 const head = interpreter.pathHead(path);
                 const tail_opt = interpreter.pathTail(path);
-                for (@typeInfo(T).@"struct".fields) |field| {
+                for (typeFields(@typeInfo(T).@"struct")) |field| {
                     if (!std.mem.eql(u8, field.name, head)) continue;
                     if (tail_opt) |tail| {
                         if (@typeInfo(interpreter.Pointee(field.type)) != .@"struct") return null;
@@ -2966,7 +2966,7 @@ fn CompiledMarkupEngine(comptime ModelT: type, comptime MsgT: type, comptime res
                     if (!supportedValue(field.type)) return null;
                     return field.type;
                 }
-                for (@typeInfo(T).@"struct".decls) |decl| {
+                for (typeDecls(@typeInfo(T).@"struct")) |decl| {
                     const DeclType = @TypeOf(@field(T, decl.name));
                     switch (@typeInfo(DeclType)) {
                         .@"fn" => |fn_info| {
@@ -3017,7 +3017,7 @@ fn CompiledMarkupEngine(comptime ModelT: type, comptime MsgT: type, comptime res
         fn hasField(comptime T: type, comptime name: []const u8) bool {
             comptime {
                 @setEvalBranchQuota(10_000);
-                for (@typeInfo(T).@"struct".fields) |field| {
+                for (typeFields(@typeInfo(T).@"struct")) |field| {
                     if (std.mem.eql(u8, field.name, name)) return true;
                 }
                 return false;
@@ -3257,7 +3257,7 @@ fn CompiledMarkupEngine(comptime ModelT: type, comptime MsgT: type, comptime res
             return switch (comptime @typeInfo(T)) {
                 .int, .float => 0,
                 .bool => false,
-                .@"enum" => |info| @field(T, info.fields[0].name),
+                .@"enum" => |info| @field(T, typeFields(info)[0].name),
                 .pointer => "",
                 .@"struct" => if (T == Ui.Node) .{} else comptime @compileError("no placeholder for " ++ @typeName(T)),
                 else => comptime @compileError("no placeholder for " ++ @typeName(T)),
@@ -3363,4 +3363,54 @@ fn CompiledMarkupEngine(comptime ModelT: type, comptime MsgT: type, comptime res
             }));
         }
     };
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
+}
+
+const TypeDecl = struct { name: [:0]const u8 };
+
+inline fn typeDecls(comptime info: anytype) []const TypeDecl {
+    const result = comptime blk: {
+        var out: [info.decl_names.len]TypeDecl = undefined;
+        for (info.decl_names, 0..) |n, i| out[i] = .{ .name = n };
+        const final = out;
+        break :blk final;
+    };
+    return &result;
 }

@@ -4790,7 +4790,7 @@ pub fn Effects(comptime Msg: type) type {
         /// Journaled wall-clock values queued for replay-mode `wallMs`
         /// reads (FIFO; fed from `.clock` records before the consuming
         /// event dispatches).
-        replay_clock: [max_effect_replay_clock_entries]i64 = [_]i64{0} ** max_effect_replay_clock_entries,
+        replay_clock: [max_effect_replay_clock_entries]i64 = @as([max_effect_replay_clock_entries]i64, @splat(0)),
         replay_clock_head: usize = 0,
         replay_clock_len: usize = 0,
         /// Replay `wallMs` reads that found no journaled value: a
@@ -5041,15 +5041,15 @@ pub fn Effects(comptime Msg: type) type {
         /// process-lifetime posting handles. Seedable in tests to pin
         /// the non-wrapping guarantee without 2^32 opens.
         channel_generation: u64 = 0,
-        slots: [total_effect_slots]Slot = [_]Slot{.{}} ** total_effect_slots,
-        file_stream_slots: [max_effect_file_streams]FileStreamSlot = [_]FileStreamSlot{.{}} ** max_effect_file_streams,
+        slots: [total_effect_slots]Slot = @as([total_effect_slots]Slot, @splat(.{})),
+        file_stream_slots: [max_effect_file_streams]FileStreamSlot = @as([max_effect_file_streams]FileStreamSlot, @splat(.{})),
         next_file_stream_generation: u64 = 1,
-        db_slots: [max_db_effects]DbSlot = [_]DbSlot{.{}} ** max_db_effects,
+        db_slots: [max_db_effects]DbSlot = @as([max_db_effects]DbSlot, @splat(.{})),
         next_db_generation: u64 = 1,
         db_revision: u64 = 0,
         /// Fixed fx timer table (see `max_effect_timers`): timers live
         /// beside the effect slots, never in them. Loop-thread only.
-        timer_slots: [max_effect_timers]TimerSlot = [_]TimerSlot{.{}} ** max_effect_timers,
+        timer_slots: [max_effect_timers]TimerSlot = @as([max_effect_timers]TimerSlot, @splat(.{})),
         /// The single audio playback channel (see `AudioChannel`).
         /// Loop-thread only, like the timer table.
         audio: AudioChannel = .{},
@@ -5062,11 +5062,11 @@ pub fn Effects(comptime Msg: type) type {
         /// `max_effect_channels`): long-lived keyed occupancies beside
         /// the effect slots. Loop-thread only — the thread-shared half
         /// of each slot lives behind its `ChannelSlot.shared` header.
-        channel_slots: [max_effect_channels]ChannelSlot = [_]ChannelSlot{.{}} ** max_effect_channels,
+        channel_slots: [max_effect_channels]ChannelSlot = @as([max_effect_channels]ChannelSlot, @splat(.{})),
         /// One independently-running capture per source. PCM itself rides the
         /// channel table; this tiny loop-side mirror exists to quiesce native
         /// audio callbacks before closing/reusing their channel occupancy.
-        audio_capture_slots: [2]AudioCaptureSlot = [_]AudioCaptureSlot{.{}} ** 2,
+        audio_capture_slots: [2]AudioCaptureSlot = @as([2]AudioCaptureSlot, @splat(.{})),
         /// Monotonic post-order stamp shared by every channel's staging
         /// FIFO and the close markers: the cross-channel delivery order
         /// and the drain boundary's causality cut (posts stamped at or
@@ -5085,7 +5085,7 @@ pub fn Effects(comptime Msg: type) type {
         /// occupancies beside the channel table. Loop-thread only —
         /// the thread-shared half of each slot lives behind its
         /// `PtySlot.shared` header.
-        pty_slots: [max_effect_ptys]PtySlot = [_]PtySlot{.{}} ** max_effect_ptys,
+        pty_slots: [max_effect_ptys]PtySlot = @as([max_effect_ptys]PtySlot, @splat(.{})),
         /// Monotonic stamp shared by every pty's staged output backlog
         /// and exit marker — the channels' `channel_seq`, pty-shaped:
         /// cross-pty delivery order and the drain boundary's causality
@@ -5902,7 +5902,7 @@ pub fn Effects(comptime Msg: type) type {
             self.pending_db_head = 0;
             self.pending_db_len = 0;
             for (&self.db_slots) |*slot| self.freeDbLive(slot);
-            self.db_slots = [_]DbSlot{.{}} ** max_db_effects;
+            self.db_slots = @as([max_db_effects]DbSlot, @splat(.{}));
             self.db_revision = 0;
             // The durable key buffers those staged Msgs referenced.
             self.releaseStagedKeys();

@@ -145,7 +145,7 @@ test "compiled widget routing preserves complete paths and caller prefixes at de
     _ = core.initialModel();
     var nodes: [40]canvas.WidgetLayoutNode = undefined;
     for (&nodes, 0..) |*n, i| n.* = node(.{ .kind = .button, .id = i + 1, .hover_msgs = true }, .init(0, 0, 30, 30), if (i > 0) i - 1 else null, i);
-    var a = [_]canvas.WidgetEventRouteEntry{.{ .phase = .bubble, .node_index = 999, .id = 999, .kind = .chart, .bounds = .init(-0.0, 1, 2, 3) }} ** 64;
+    var a = @as([64]canvas.WidgetEventRouteEntry, @splat(.{ .phase = .bubble, .node_index = 999, .id = 999, .kind = .chart, .bounds = .init(-0.0, 1, 2, 3) }));
     var b = a;
     for ([_]usize{ 1, 2, 31, 32, 33, 40 }) |depth| for ([_]usize{ 0, 1, 2, 3, 31, 62, 63, 64 }) |capacity| {
         const reference = tree{ .nodes = nodes[0..depth] };

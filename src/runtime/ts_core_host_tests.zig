@@ -2328,7 +2328,7 @@ test "a truncated collect routes err - a cut stdout never parses as whole" {
     Host.dispatch(fx, .run_collect);
     // Overfill the collect buffer past the engine bound; the fake
     // executor mirrors the real truncation flag.
-    const chunk = "x" ** 4096;
+    const chunk = strRepeat("x", 4096);
     var fed: usize = 0;
     while (fed <= effects_mod.max_effect_collect_bytes) : (fed += chunk.len) {
         try fx.feedOutput(job_spawn_key, chunk);
@@ -3352,7 +3352,7 @@ const delay_policy_probe_core = struct {
     }
     pub const commitModelRoot = mini_core.commitModelRoot;
     var lookup_enabled: bool = false;
-    var calls = [_]usize{0} ** 8;
+    var calls = @as([8]usize, @splat(0));
 
     pub fn nativeTimerPolicy(request: []const u8, output: []u8) usize {
         calls[request[0]] += 1;
@@ -3455,7 +3455,7 @@ const db_policy_probe_core = struct {
     var retain: bool = true;
     var rearm: bool = true;
     var lookup: bool = true;
-    var calls = [_]usize{0} ** 3;
+    var calls = @as([3]usize, @splat(0));
 
     pub fn nativeDbPolicy(request: []const u8, output: []u8) usize {
         calls[request[0]] += 1;
@@ -3639,7 +3639,7 @@ const effect_policy_probe_core = struct {
     pub const subscriptions = mini_core.subscriptions;
     pub const commitModelRoot = mini_core.commitModelRoot;
     var lookup_enabled: bool = true;
-    var calls = [_]usize{0} ** 18;
+    var calls = @as([18]usize, @splat(0));
 
     pub fn nativeEffectPolicy(request: []const u8, output: []u8) usize {
         calls[request[0]] += 1;
@@ -3761,7 +3761,7 @@ const stream_policy_probe_core = struct {
     pub const commitModelRoot = mini_core.commitModelRoot;
     var admit = false;
     var lookup = false;
-    var calls = [_]usize{0} ** 5;
+    var calls = @as([5]usize, @splat(0));
     pub fn nativeStreamPolicy(request: []const u8, output: []u8) usize {
         calls[request[0]] += 1;
         @memset(rt.frameAlloc(u8, 37), 255);
@@ -4368,7 +4368,7 @@ const media_policy_probe_core = struct {
     var lookup = true;
     var retire = true;
     var transport = true;
-    var calls = [_]usize{0} ** 8;
+    var calls = @as([8]usize, @splat(0));
     var owned_after_restart = false;
 
     pub fn nativeEffectPolicy(request: []const u8, output: []u8) usize {
@@ -4541,7 +4541,7 @@ const coordination_policy_probe_core = struct {
     var lookup = true;
     var bind = true;
     var retire = true;
-    var calls = [_]usize{0} ** 11;
+    var calls = @as([11]usize, @splat(0));
     pub fn nativeEffectPolicy(request: []const u8, output: []u8) usize {
         if (request[0] >= 11) return referenceCoordinationPolicy(request, output);
         calls[request[0]] += 1;
@@ -5254,4 +5254,16 @@ test "image and named cancellation preserve the other family's incumbent and que
         try std.testing.expectEqual(.decode_failed, WordHost.model().image.?.state);
         try std.testing.expectEqual(@as(usize, 1), WordHost.model().image_replies);
     }
+}
+
+/// Comptime string repetition; replaces the `**` operator removed in Zig 0.17.
+inline fn strRepeat(comptime s: []const u8, comptime n: usize) *const [s.len * n:0]u8 {
+    const rep_result = comptime blk: {
+        @setEvalBranchQuota(n * (s.len + 4) + 1000);
+        var buf: [s.len * n:0]u8 = undefined;
+        for (0..n) |i| @memcpy(buf[i * s.len ..][0..s.len], s);
+        const rep_final = buf;
+        break :blk rep_final;
+    };
+    return &rep_result;
 }

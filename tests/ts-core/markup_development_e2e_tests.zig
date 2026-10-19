@@ -56,7 +56,7 @@ test "compiled markup development preserves complete retained files records raw 
     defer std.testing.allocator.destroy(b);
     a.* = .{};
     b.* = .{ .policy = observed, .allocator = std.testing.allocator };
-    const paths = [_][]const u8{ "", "parts.native", "日本\x00\xff", "x" ** 241 };
+    const paths = [_][]const u8{ "", "parts.native", "日本\x00\xff", strRepeat("x", 241) };
     for (paths, 0..) |path, i| {
         try a.addFile(path, path, std.math.maxInt(u64) - i);
         try b.addFile(path, path, std.math.maxInt(u64) - i);
@@ -71,7 +71,7 @@ test "compiled markup development preserves complete retained files records raw 
     const key_sets = [_][]const sdk.canvas.ui_provenance.Key{
         &.{},                                                          &.{.{ .str = "" }},                          &.{ .{ .str = &raw }, .{ .index = std.math.maxInt(usize) } },
         &.{ .{ .str = "日本\x00\xff" }, .{ .int = std.math.maxInt(u64) }, .{ .index = std.math.maxInt(usize) } },
-        &.{ .{ .str = "x" ** 45 }, .{ .int = std.math.maxInt(u64) } }, &.{ .{ .str = "x" ** 47 }, .{ .str = "" } },
+        &.{ .{ .str = strRepeat("x", 45) }, .{ .int = std.math.maxInt(u64) } }, &.{ .{ .str = strRepeat("x", 47) }, .{ .str = "" } },
     };
     const empty_keys: [60]sdk.canvas.ui_provenance.Key = @splat(.{ .str = "" });
     var id: u64 = 9007199254740993;
@@ -101,8 +101,8 @@ test "compiled markup development preserves closure and provenance capacity refu
     var a = reference.ClosureFiles{};
     var b = retained.ClosureFiles{ .policy = observed };
     for (0..reference.max_files + 2) |i| {
-        a.add("p" ** 242, std.math.maxInt(u64) - i);
-        b.add("p" ** 242, std.math.maxInt(u64) - i);
+        a.add(strRepeat("p", 242), std.math.maxInt(u64) - i);
+        b.add(strRepeat("p", 242), std.math.maxInt(u64) - i);
     }
     try exact(a.len, b.len);
     try exact(a.overflow, b.overflow);
@@ -258,7 +258,7 @@ const AppPair = struct {
         try self.apps[0].provenance.writeResponse(&left_writer, "canvas", 0);
         try self.apps[1].provenance.writeResponse(&right_writer, "canvas", 0);
         try exact(left_writer.buffered(), right_writer.buffered());
-        if (comptime @import("builtin").mode == .Debug) for (self.apps[0].markup_fragment_slots, self.apps[1].markup_fragment_slots) |left, right| {
+        if (comptime @import("builtin").mode == .debug) for (self.apps[0].markup_fragment_slots, self.apps[1].markup_fragment_slots) |left, right| {
             try exact(left.hash, right.hash);
             try exact(left.baseline_hash, right.baseline_hash);
             try exact(left.arena_index, right.arena_index);
@@ -344,7 +344,7 @@ fn fragmentView(ui: *App.Ui, model: *const Model) App.Ui.Node {
     return ui.column(.{ .gap = 8 }, .{ ui.text(.{}, ui.fmt("Count {d}", .{model.count})), Fragment.build(ui, model), OtherFragment.build(ui, model) });
 }
 test "compiled markup development fragments preserve shared import failure recovery and compiled reversion" {
-    if (comptime @import("builtin").mode != .Debug) return error.SkipZigTest;
+    if (comptime @import("builtin").mode != .debug) return error.SkipZigTest;
     _ = core.initialModel();
     const io = std.testing.io;
     const cwd = std.Io.Dir.cwd();
@@ -376,4 +376,16 @@ test "compiled markup development fragments preserve shared import failure recov
     try std.testing.expect(pair.apps[1].markup_diagnostic == null);
     _ = try pair.id("Reset");
     for (calls) |count| try std.testing.expect(count != 0);
+}
+
+/// Comptime string repetition; replaces the `**` operator removed in Zig 0.17.
+inline fn strRepeat(comptime s: []const u8, comptime n: usize) *const [s.len * n:0]u8 {
+    const rep_result = comptime blk: {
+        @setEvalBranchQuota(n * (s.len + 4) + 1000);
+        var buf: [s.len * n:0]u8 = undefined;
+        for (0..n) |i| @memcpy(buf[i * s.len ..][0..s.len], s);
+        const rep_final = buf;
+        break :blk rep_final;
+    };
+    return &rep_result;
 }

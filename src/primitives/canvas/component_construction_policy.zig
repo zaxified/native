@@ -13,21 +13,21 @@ const action_fields = .{ "focus", "press", "toggle", "increment", "decrement", "
 comptime {
     @setEvalBranchQuota(10000);
     const names = .{ "stack", "row", "column", "grid", "data_grid", "table", "scroll_view", "list", "breadcrumb", "button_group", "pagination", "radio_group", "tabs", "toggle_group", "accordion", "bubble", "resizable", "alert", "card", "dialog", "drawer", "sheet", "panel", "popover", "menu_surface", "dropdown_menu", "text", "icon", "image", "avatar", "badge", "button", "toggle_button", "icon_button", "select", "input", "text_field", "search_field", "combobox", "textarea", "tooltip", "menu_item", "list_item", "data_row", "data_cell", "status_bar", "segmented_control", "checkbox", "radio", "switch_control", "toggle", "slider", "progress", "separator", "skeleton", "spinner", "chart", "split", "split_divider", "tree", "input_group", "media_surface", "terminal" };
-    const actual = @typeInfo(widgets.WidgetKind).@"enum".fields;
+    const actual = typeFields(@typeInfo(widgets.WidgetKind).@"enum");
     if (actual.len != names.len) @compileError("update construction kind wire");
     for (names, actual) |name, field| if (!std.mem.eql(u8, name, field.name)) @compileError("construction kind wire changed");
     const colors = .{ "background", "surface", "surface_subtle", "surface_pressed", "text", "text_muted", "syntax_plain", "syntax_comment", "syntax_keyword", "syntax_literal", "syntax_function", "syntax_property", "syntax_constant", "border", "accent", "accent_text", "destructive", "destructive_text", "success", "success_text", "warning", "warning_text", "info", "info_text", "focus_ring", "shadow", "scrim", "disabled" };
-    const color_actual = @typeInfo(tokens.ColorTokens).@"struct".fields;
+    const color_actual = typeFields(@typeInfo(tokens.ColorTokens).@"struct");
     if (color_actual.len != colors.len) @compileError("update construction token wire");
     for (colors, color_actual) |name, field| if (!std.mem.eql(u8, name, field.name)) @compileError("construction color wire changed");
     guardEnum(std.meta.FieldEnum(tokens.ColorTokens), colors);
     const radii = .{ "sm", "md", "lg", "xl", "none" };
-    const radius_actual = @typeInfo(tokens.RadiusTokens).@"struct".fields;
+    const radius_actual = typeFields(@typeInfo(tokens.RadiusTokens).@"struct");
     if (radius_actual.len != radii.len) @compileError("update construction radius wire");
     for (radii, radius_actual) |name, field| if (!std.mem.eql(u8, name, field.name)) @compileError("construction radius wire changed");
     guardEnum(std.meta.FieldEnum(tokens.RadiusTokens), radii);
     const builtins = .{ "accordion", "alert", "avatar", "badge", "breadcrumb", "bubble", "button", "button_group", "card", "checkbox", "combobox", "dialog", "drawer", "dropdown_menu", "input", "pagination", "progress", "radio_group", "resizable", "select", "separator", "sheet", "skeleton", "slider", "spinner", "switch_control", "table", "tabs", "textarea", "toggle", "toggle_group", "tooltip" };
-    const builtin_actual = @typeInfo(widgets.BuiltinComponentKind).@"enum".fields;
+    const builtin_actual = typeFields(@typeInfo(widgets.BuiltinComponentKind).@"enum");
     if (builtin_actual.len != builtins.len) @compileError("update construction builtin wire");
     for (builtins, builtin_actual) |name, field| if (!std.mem.eql(u8, name, field.name)) @compileError("construction builtin wire changed");
     guardEnum(widgets.WidgetSize, .{ "default", "sm", "lg", "icon", "heading", "display" });
@@ -36,13 +36,13 @@ comptime {
     guardEnum(widgets.WidgetAnchorPlacement, .{ "below", "above" });
     guardEnum(widgets.WidgetAnchorAlignment, .{ "start", "end", "stretch" });
     guardEnum(widgets.WidgetRole, .{ "none", "group", "text", "link", "image", "button", "textbox", "tooltip", "dialog", "menu", "menuitem", "list", "listitem", "row", "grid", "gridcell", "tab", "checkbox", "radio", "radiogroup", "switch_control", "slider", "progressbar", "chart", "tree", "treeitem", "separator" });
-    const action_actual = @typeInfo(widgets.WidgetActions).@"struct".fields;
+    const action_actual = typeFields(@typeInfo(widgets.WidgetActions).@"struct");
     if (action_actual.len != action_fields.len) @compileError("update construction action wire");
     for (action_fields, action_actual) |name, field| if (!std.mem.eql(u8, name, field.name)) @compileError("construction action wire changed");
 }
 
 fn guardEnum(comptime T: type, comptime names: anytype) void {
-    const fields = @typeInfo(T).@"enum".fields;
+    const fields = typeFields(@typeInfo(T).@"enum");
     if (fields.len != names.len) @compileError("update construction enum wire");
     for (names, fields, 0..) |name, field, i| if (!std.mem.eql(u8, name, field.name) or field.value != i) @compileError("construction enum wire changed");
 }
@@ -89,8 +89,8 @@ pub fn finalize(policy: Policy, widget: *Widget, refs: anytype, live_tokens: tok
         putFloat(input[120..124], v);
     }
     std.mem.writeInt(u32, input[20..24], mask, .little);
-    inline for (@typeInfo(tokens.ColorTokens).@"struct".fields, 0..) |field, i| putColor(input[124 + i * 16 ..][0..16], @field(live_tokens.colors, field.name));
-    inline for (@typeInfo(tokens.RadiusTokens).@"struct".fields, 0..) |field, i| putFloat(input[572 + i * 4 ..][0..4], @field(live_tokens.radius, field.name));
+    inline for (typeFields(@typeInfo(tokens.ColorTokens).@"struct"), 0..) |field, i| putColor(input[124 + i * 16 ..][0..16], @field(live_tokens.colors, field.name));
+    inline for (typeFields(@typeInfo(tokens.RadiusTokens).@"struct"), 0..) |field, i| putFloat(input[572 + i * 4 ..][0..4], @field(live_tokens.radius, field.name));
     var out: [108]u8 = undefined;
     if (policy(&input, &out) != out.len or std.mem.readInt(u16, out[0..2], .little) > 2047 or out[2] > 15 or out[3] != 0) @panic("invalid compiled final construction");
     mask = std.mem.readInt(u32, out[4..8], .little);
@@ -140,7 +140,7 @@ pub fn builtin(policy: Policy, component: widgets.BuiltinComponentKind, widget: 
     putFloat(input[28..32], options.layout.min_size.width);
     putFloat(input[32..36], options.layout.min_size.height);
     var out: [36]u8 = undefined;
-    if (policy(&input, &out) != out.len or out[0] > 62 or out[1] > 5 or out[2] > 5 or out[3] >= @typeInfo(widgets.WidgetRole).@"enum".fields.len or out[4] > 3 or out[5] > 1 or out[6] > 1 or out[7] != 0) @panic("invalid compiled builtin construction");
+    if (policy(&input, &out) != out.len or out[0] > 62 or out[1] > 5 or out[2] > 5 or out[3] >= typeFields(@typeInfo(widgets.WidgetRole).@"enum").len or out[4] > 3 or out[5] > 1 or out[6] > 1 or out[7] != 0) @panic("invalid compiled builtin construction");
     widget.kind = @enumFromInt(out[0]);
     widget.variant = @enumFromInt(out[1]);
     widget.size = @enumFromInt(out[2]);
@@ -184,4 +184,42 @@ fn readColor(bytes: []const u8) Color {
     var value: Color = undefined;
     inline for (.{ "r", "g", "b", "a" }, 0..) |name, i| @field(value, name) = readFloat(bytes[i * 4 ..][0..4]);
     return value;
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

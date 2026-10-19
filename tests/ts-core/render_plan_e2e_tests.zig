@@ -17,9 +17,9 @@ fn stateParity(commands: []const canvas.CanvasCommand, capacity: usize) !void {
     @memset(b, sentinel);
     var native = canvas.RenderPlanner.init(a);
     var compiled = canvas.RenderPlanner.init(b);
-    native.clip_stack = .{sdk.geometry.RectF.init(41, 42, 43, 44)} ** 32;
+    native.clip_stack = @splat(sdk.geometry.RectF.init(41, 42, 43, 44));
     compiled.clip_stack = native.clip_stack;
-    native.opacity_stack = .{0.125} ** 32;
+    native.opacity_stack = @splat(0.125);
     compiled.opacity_stack = native.opacity_stack;
     var workspace = Workspace.initPlanning(core.nativeWindowPolicy, commands.len, capacity);
     defer workspace.deinit();
@@ -81,7 +81,7 @@ test "compiled render stacks preserve every f32 state command bound and written 
     for (0..6) |axis| {
         const original = commands[0].transform;
         for (samples) |sample| {
-            if (builtin.mode != .ReleaseFast and !std.math.isFinite(sample)) continue;
+            if (builtin.mode != .fast and !std.math.isFinite(sample)) continue;
             switch (axis) {
                 0 => commands[0].transform.a = sample,
                 1 => commands[0].transform.b = sample,
@@ -211,7 +211,7 @@ test "render continuations preserve observable measurement order visibility and 
         &.{ .{ .push_clip = .{ .rect = .init(1000, 1000, 1, 1) } }, text, .pop_clip, text },
     };
     for (cases) |commands| for ([_]usize{ 0, 1, 4 }) |capacity| {
-        var a: [4]canvas.RenderCommand = .{sentinel} ** 4;
+        var a: [4]canvas.RenderCommand = @splat(sentinel);
         var b = a;
         var native = canvas.RenderPlanner.init(a[0..capacity]);
         var compiled = canvas.RenderPlanner.init(b[0..capacity]);
@@ -242,7 +242,7 @@ test "native measurement callbacks observe the same accepted planner prefix duri
             return 11 + @as(f32, @floatFromInt(self.planner.len)) + self.planner.state.opacity + @as(f32, @floatFromInt(self.planner.clip_stack_len));
         }
     };
-    var a: [4]canvas.RenderCommand = .{sentinel} ** 4;
+    var a: [4]canvas.RenderCommand = @splat(sentinel);
     var b = a;
     var native = canvas.RenderPlanner.init(&a);
     var compiled = canvas.RenderPlanner.init(&b);

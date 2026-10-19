@@ -942,7 +942,7 @@ test "cover assets register at install and bind the grid avatars by album id" {
     // art is JPEG for real hosts' codecs; the null platform's strict
     // decoder takes the engine's own PNG output — same register path the
     // generated wiring drives from app.zon).
-    const rgba = [_]u8{ 200, 40, 40, 255 } ** 4;
+    const rgba = arrRepeat(u8, &.{ 200, 40, 40, 255 }, 4);
     var encoded: [256]u8 = undefined;
     var png_writer = std.Io.Writer.fixed(&encoded);
     try canvas.png.writeRgba8(&png_writer, 2, 2, &rgba);
@@ -1261,4 +1261,12 @@ fn parityShot(h: *Harness, io: std.Io, comptime name: []const u8, size_index: us
     const dir = try std.fmt.bufPrint(&dir_buffer, "/tmp/parity-shots/{s}-{d}-artifacts", .{ name, size_index });
     h.harness.runtime.options.automation = native_sdk.automation.Server.init(io, dir, "SoundboardTS");
     try h.harness.runtime.dispatchAutomationCommand(h.app, "screenshot soundboard-canvas 2");
+}
+
+/// Comptime array repetition; replaces the `**` operator removed in Zig 0.17.
+fn arrRepeat(comptime T: type, comptime unit: []const T, comptime n: usize) [unit.len * n]T {
+    @setEvalBranchQuota(n * (unit.len + 4) + 1000);
+    var buf: [unit.len * n]T = undefined;
+    for (0..n) |i| @memcpy(buf[i * unit.len ..][0..unit.len], unit);
+    return buf;
 }

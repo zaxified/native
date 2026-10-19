@@ -24,8 +24,8 @@ const layout_rules = [_]layout_audit.LayoutAuditRuleKind{ .text_overflow, .sibli
 const roles = [_]widgets.WidgetRole{ .none, .group, .text, .link, .image, .button, .textbox, .tooltip, .dialog, .menu, .menuitem, .list, .listitem, .row, .grid, .gridcell, .tab, .checkbox, .radio, .radiogroup, .switch_control, .slider, .progressbar, .chart, .tree, .treeitem, .separator };
 const sizes = [_]widgets.WidgetSize{ .sm, .default, .lg, .icon, .heading, .display };
 comptime {
-    if (a11y_rules.len != @typeInfo(a11y_audit.A11yAuditRuleKind).@"enum".fields.len or layout_rules.len != @typeInfo(layout_audit.LayoutAuditRuleKind).@"enum".fields.len) @compileError("update widget audit rule codes");
-    if (roles.len != @typeInfo(widgets.WidgetRole).@"enum".fields.len or sizes.len != @typeInfo(widgets.WidgetSize).@"enum".fields.len)
+    if (a11y_rules.len != typeFields(@typeInfo(a11y_audit.A11yAuditRuleKind).@"enum").len or layout_rules.len != typeFields(@typeInfo(layout_audit.LayoutAuditRuleKind).@"enum").len) @compileError("update widget audit rule codes");
+    if (roles.len != typeFields(@typeInfo(widgets.WidgetRole).@"enum").len or sizes.len != typeFields(@typeInfo(widgets.WidgetSize).@"enum").len)
         @compileError("update widget audit wire codes");
 }
 fn code(comptime T: type, values: []const T, value: T) u32 {
@@ -290,4 +290,42 @@ pub fn auditLayout(allocator: std.mem.Allocator, policy: Policy, layout: runtime
         finding.* = .{ .rule = layout_rules[read(bytes, 0)], .node_index = read(bytes, 4), .other_index = if (read(bytes, 8) == missing) null else read(bytes, 8), .overrun_x = readFloat(bytes, 12), .overrun_y = readFloat(bytes, 16), .lines = read(bytes, 20) };
     }
     return .{ .findings = storage[0..count], .total = read(plan.result, 8) };
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

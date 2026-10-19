@@ -10,7 +10,7 @@ pub const Filter = enum { all, active, done };
 
 pub const Task = struct {
     id: u32,
-    title_storage: [24]u8 = [_]u8{0} ** 24,
+    title_storage: [24]u8 = @as([24]u8, @splat(0)),
     title_len: usize = 0,
     done: bool = false,
 
@@ -536,12 +536,12 @@ test "explicit style values win over token references" {
 
 test "the style token name lists match the canvas token structs and the interpreter table" {
     // Every ColorTokens field is listed, and every listed name is a field.
-    const color_fields = @typeInfo(canvas.ColorTokens).@"struct".fields;
+    const color_fields = typeFields(@typeInfo(canvas.ColorTokens).@"struct");
     try testing.expectEqual(color_fields.len, canvas.ui_markup.known_color_token_names.len);
     inline for (color_fields) |field| {
         try testing.expect(nameListed(field.name, &canvas.ui_markup.known_color_token_names));
     }
-    const radius_fields = @typeInfo(canvas.RadiusTokens).@"struct".fields;
+    const radius_fields = typeFields(@typeInfo(canvas.RadiusTokens).@"struct");
     try testing.expectEqual(radius_fields.len, canvas.ui_markup.known_radius_token_names.len);
     inline for (radius_fields) |field| {
         try testing.expect(nameListed(field.name, &canvas.ui_markup.known_radius_token_names));
@@ -553,7 +553,7 @@ test "the style token name lists match the canvas token structs and the interpre
     }
     // Every color entry targets a StyleTokenRefs field, and every color
     // field of StyleTokenRefs is reachable from markup.
-    inline for (@typeInfo(canvas.StyleTokenRefs).@"struct".fields) |field| {
+    inline for (typeFields(@typeInfo(canvas.StyleTokenRefs).@"struct")) |field| {
         if (comptime std.mem.eql(u8, field.name, "radius")) continue;
         var found = false;
         for (markup_view.color_style_attr_fields) |entry| {
@@ -813,7 +813,7 @@ test "axis and value-x stamp the region's scroll axes and horizontal offset" {
 test "axis value vocabulary mirrors the live ScrollAxes enum" {
     // The validator's std-only mirror of the enum's member names; a new
     // member cannot ship without its markup spelling.
-    const fields = @typeInfo(canvas.ScrollAxes).@"enum".fields;
+    const fields = typeFields(@typeInfo(canvas.ScrollAxes).@"enum");
     try testing.expectEqual(fields.len, canvas.ui_markup.axis_value_names.len);
     inline for (fields, 0..) |field, index| {
         try testing.expectEqualStrings(field.name, canvas.ui_markup.axis_value_names[index]);
@@ -823,7 +823,7 @@ test "axis value vocabulary mirrors the live ScrollAxes enum" {
 test "overscroll value vocabulary mirrors the live WidgetOverscroll enum" {
     // The validator's std-only mirror of the enum's member names; a new
     // member cannot ship without its markup spelling.
-    const fields = @typeInfo(canvas.WidgetOverscroll).@"enum".fields;
+    const fields = typeFields(@typeInfo(canvas.WidgetOverscroll).@"enum");
     try testing.expectEqual(fields.len, canvas.ui_markup.overscroll_value_names.len);
     inline for (fields, 0..) |field, index| {
         try testing.expectEqualStrings(field.name, canvas.ui_markup.overscroll_value_names[index]);
@@ -833,7 +833,7 @@ test "overscroll value vocabulary mirrors the live WidgetOverscroll enum" {
 test "overflow value vocabulary mirrors the live TextOverflow enum" {
     // The validator's std-only mirror of the enum's member names; a new
     // member cannot ship without its markup spelling.
-    const fields = @typeInfo(canvas.TextOverflow).@"enum".fields;
+    const fields = typeFields(@typeInfo(canvas.TextOverflow).@"enum");
     try testing.expectEqual(fields.len, canvas.ui_markup.overflow_value_names.len);
     inline for (fields, 0..) |field, index| {
         try testing.expectEqualStrings(field.name, canvas.ui_markup.overflow_value_names[index]);
@@ -942,7 +942,7 @@ test "tooltip-delay model binding past i32 max fails the build instead of trappi
 test "resize-easing value vocabulary mirrors the live Easing enum" {
     // The validator's std-only mirror of the enum's member names; a new
     // member cannot ship without its markup spelling.
-    const fields = @typeInfo(canvas.Easing).@"enum".fields;
+    const fields = typeFields(@typeInfo(canvas.Easing).@"enum");
     try testing.expectEqual(fields.len, canvas.ui_markup.resize_easing_value_names.len);
     inline for (fields, 0..) |field, index| {
         try testing.expectEqualStrings(field.name, canvas.ui_markup.resize_easing_value_names[index]);
@@ -952,7 +952,7 @@ test "resize-easing value vocabulary mirrors the live Easing enum" {
 test "span weight vocabulary mirrors the live TextSpanWeight enum" {
     // The validator's std-only mirror of the enum's member names; a new
     // member cannot ship without its markup spelling.
-    const fields = @typeInfo(canvas.TextSpanWeight).@"enum".fields;
+    const fields = typeFields(@typeInfo(canvas.TextSpanWeight).@"enum");
     try testing.expectEqual(fields.len, canvas.ui_markup.span_weight_value_names.len);
     inline for (fields, 0..) |field, index| {
         try testing.expectEqualStrings(field.name, canvas.ui_markup.span_weight_value_names[index]);
@@ -1041,7 +1041,7 @@ test "the registry's size vocabulary matches the live WidgetSize enum" {
     // canvas.WidgetSize; the registry's std-only mirrors (control scale +
     // text-only typography rungs) must list exactly the same names so the
     // validator and the engines accept identically.
-    const fields = std.meta.fields(canvas.WidgetSize);
+    const fields = typeFieldsOf(canvas.WidgetSize);
     try testing.expectEqual(
         fields.len,
         canvas.ui_markup.schema.control_size_value_names.len + canvas.ui_markup.schema.text_size_value_names.len,
@@ -1519,7 +1519,7 @@ test "the registry's role vocabulary matches the live WidgetRole enum" {
     // role="..." values resolve through std.meta.stringToEnum on
     // canvas.WidgetRole; the registry's std-only mirror must list exactly
     // the same names so the validator and the engines accept identically.
-    const fields = std.meta.fields(canvas.WidgetRole);
+    const fields = typeFieldsOf(canvas.WidgetRole);
     try testing.expectEqual(fields.len, canvas.ui_markup.schema.role_names.len);
     inline for (fields) |field| {
         try testing.expect(nameListed(field.name, &canvas.ui_markup.schema.role_names));
@@ -5175,4 +5175,42 @@ test "the interpreter binds on-input to a declared mirror union and translates e
     try testing.expectEqual(@as(?i64, 2), composed.edit.set_composition.cursor);
     const cleared = tree.msgForTextEdit(field.id, .{ .set_composition = .{ .text = "", .cursor = null } }).?;
     try testing.expectEqual(@as(?i64, null), cleared.edit.set_composition.cursor);
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

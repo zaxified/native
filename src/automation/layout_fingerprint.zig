@@ -52,14 +52,14 @@ pub fn describe(comptime T: type) []const u8 {
             .void => return "void",
             .@"enum" => |info| {
                 var out: []const u8 = "enum(" ++ @typeName(info.tag_type) ++ "){";
-                for (info.fields) |field| {
+                for (typeFields(info)) |field| {
                     out = out ++ field.name ++ "=" ++ std.fmt.comptimePrint("{d}", .{field.value}) ++ ",";
                 }
                 return out ++ "}";
             },
             .@"struct" => |info| {
                 var out: []const u8 = "struct{";
-                for (info.fields) |field| {
+                for (typeFields(info)) |field| {
                     out = out ++ field.name ++ ":" ++ describe(field.type) ++ ",";
                 }
                 return out ++ "}";
@@ -74,7 +74,7 @@ pub fn describe(comptime T: type) []const u8 {
                     "union(" ++ describe(tag) ++ "){"
                 else
                     "union{";
-                for (info.fields) |field| {
+                for (typeFields(info)) |field| {
                     out = out ++ field.name ++ ":" ++ describe(field.type) ++ ",";
                 }
                 return out ++ "}";
@@ -157,4 +157,42 @@ test "describe reaches through optionals, arrays, slices, and nesting" {
         "struct{scheme:enum(u8){light=0,dark=1,},point:?struct{x:f32,y:f32,},bands:[4]u8,paths:[][]u8,handle:?*anyopaque,}",
         comptime describe(Outer),
     );
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

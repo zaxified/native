@@ -137,8 +137,8 @@ const scene = [_]canvas.CanvasCommand{
 };
 var resource_calls: [3]usize = @splat(0);
 var vector_calls: [2]usize = @splat(0);
-var family_calls: [6]usize = .{0} ** 6;
-var planning_calls: [2]usize = .{0} ** 2;
+var family_calls: [6]usize = @splat(0);
+var planning_calls: [2]usize = @splat(0);
 fn observedPolicy(request: []const u8, output: []u8) usize {
     if (request[0] == 64) resource_calls[request[2]] += 1;
     if (request[0] == 63) vector_calls[request[2]] += 1;
@@ -174,21 +174,21 @@ test "compiled render resources: both runtime frame consumers preserve complete 
         const options = canvas.CanvasFrameOptions{ .frame_index = 9007199254740993 + phase, .timestamp_ns = 33, .full_repaint = true };
         resource_calls = @splat(0);
         vector_calls = @splat(0);
-        family_calls = .{0} ** 6;
-        planning_calls = .{0} ** 2;
+        family_calls = @splat(0);
+        planning_calls = @splat(0);
         const diagnostic = try native.runtime.canvasFramePlan(1, "canvas", null, options, a.value);
         try frameEqual(diagnostic, try compiled.runtime.canvasFramePlan(1, "canvas", null, options, b.value), observedPolicy);
-        try exact([_]usize{1} ** 6, family_calls);
+        try exact(@as([6]usize, @splat(1)), family_calls);
         try exact([_]usize{ 1, 1, 1 }, resource_calls);
         try exact([_]usize{ 1, 1 }, vector_calls);
         try exact([_]usize{ 1, 1 }, planning_calls);
         resource_calls = @splat(0);
         vector_calls = @splat(0);
-        family_calls = .{0} ** 6;
-        planning_calls = .{0} ** 2;
+        family_calls = @splat(0);
+        planning_calls = @splat(0);
         const presentation = try native.runtime.nextCanvasFrame(1, "canvas", options, a.value);
         try frameEqual(presentation, try compiled.runtime.nextCanvasFrame(1, "canvas", options, b.value), observedPolicy);
-        try exact([_]usize{1} ** 6, family_calls);
+        try exact(@as([6]usize, @splat(1)), family_calls);
         try exact([_]usize{ 1, 1, 1 }, resource_calls);
         try exact([_]usize{ 1, 1 }, vector_calls);
         try exact([_]usize{ 1, 1 }, planning_calls);
@@ -223,7 +223,7 @@ test "frame cache failure preserves action-before-entry storage and prevents dow
     sb.resources = sb.resources[0..0];
     try std.testing.expectError(error.RenderPipelineCacheListFull, list.framePlan(null, .{}, sa));
     vector_calls = @splat(0);
-    family_calls = .{0} ** 6;
+    family_calls = @splat(0);
     try std.testing.expectError(error.RenderPipelineCacheListFull, list.framePlan(null, .{ .render_cache_policy = observedPolicy }, sb));
     try exact([_]usize{ 1, 0, 0, 0, 0, 0 }, family_calls);
     try exact(a.value, b.value);
@@ -291,10 +291,10 @@ test "render and batch failures precede every cache and preserve complete frame 
         try std.testing.expectError(err, list.framePlan(null, .{}, sa));
         resource_calls = @splat(0);
         vector_calls = @splat(0);
-        family_calls = .{0} ** 6;
-        planning_calls = .{0} ** 2;
+        family_calls = @splat(0);
+        planning_calls = @splat(0);
         try std.testing.expectError(err, list.framePlan(null, .{ .render_cache_policy = observedPolicy, .render_plan_policy = observedPolicy }, sb));
-        try exact([_]usize{0} ** 6, family_calls);
+        try exact(@as([6]usize, @splat(0)), family_calls);
         try exact([_]usize{ 1, @intFromBool(batch) }, planning_calls);
         try exact(a.value, b.value);
         core.rt.frameReset();
@@ -313,13 +313,13 @@ test "compiled vector resources: render planning and resource ownership remain i
     for ([_]bool{ false, true }) |plan| {
         resource_calls = @splat(0);
         vector_calls = @splat(0);
-        family_calls = .{0} ** 6;
-        planning_calls = .{0} ** 2;
+        family_calls = @splat(0);
+        planning_calls = @splat(0);
         const compiled = try list.framePlan(null, .{ .render_cache_policy = if (plan) null else observedPolicy, .render_plan_policy = if (plan) observedPolicy else null }, b.value);
         try frameEqual(reference, compiled, if (plan) null else observedPolicy);
-        try exact([_]usize{if (plan) 0 else 1} ** 6, family_calls);
-        try exact([_]usize{if (plan) 0 else 1} ** 2, vector_calls);
-        try exact([_]usize{if (plan) 1 else 0} ** 2, planning_calls);
+        try exact(@as([6]usize, @splat(if (plan) 0 else 1)), family_calls);
+        try exact(@as([2]usize, @splat(if (plan) 0 else 1)), vector_calls);
+        try exact(@as([2]usize, @splat(if (plan) 1 else 0)), planning_calls);
         core.rt.frameReset();
     }
 }

@@ -58,7 +58,7 @@ test "compiled blob bounded probes compare every byte and stop at original short
     }
     try same(.probe, .{});
     for (values[0..6]) |at| try same(.probe, .{ .flags = 1, .words = .{ at + 4096, at, 4096, 4096, 0, 0 }, .a = &bytes, .b = &bytes });
-    const hash = [_]u8{0} ** 16;
+    const hash = @as([16]u8, @splat(0));
     var bad = hash;
     bad[15] = 1;
     try same(.hash, .{ .a = &hash, .b = &hash });

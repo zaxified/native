@@ -107,7 +107,7 @@ pub fn resultValidFacts(request: []const u8, source_len: usize, facts_start: usi
     const advance_at: u64 = facts_start + @as(u64, glyph_count) * 32;
     const text_at: u64 = advance_at + @as(u64, text_len) * 4;
     if (text_at > source_len or word(request, 8) != text_at or word(request, 12) != source_len or text_at + text_len != source_len) return false;
-    const reserved_zero = [_]u8{0} ** 136;
+    const reserved_zero = @as([136]u8, @splat(0));
     if (!std.mem.eql(u8, result[376..512], &reserved_zero)) return false;
     if (word(result, 296) > 1 or word(result, 300) > 1 or word(result, 356) > 1 or word(result, 364) > 1) return false;
     if (request[2] == 2 or request[2] == 3) if (!std.mem.eql(u8, request[320..384], result[320..384])) return false;

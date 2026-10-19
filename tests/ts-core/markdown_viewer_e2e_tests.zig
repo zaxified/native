@@ -312,7 +312,7 @@ test "Markdown Viewer restores duplicate bounded recents and persists exact byte
     Host.dispatch(&pair.fx, .{ .app_data = "/viewer-test/data" });
     try pair.check();
     var paths: [4096]u8 = undefined;
-    const too_long = [_]u8{'x'} ** 513;
+    const too_long = @as([513]u8, @splat('x'));
     const input = try std.fmt.bufPrint(&paths, " \t\r\n/first.md\n/first.md\n{s}\n\t/second.md\r\n/third.md\n/fourth.md\n/fifth.md\n/sixth.md\n", .{too_long});
     try pair.file(.ok, input);
     try testing.expectEqual(@as(usize, 6), pair.model.recent_count);

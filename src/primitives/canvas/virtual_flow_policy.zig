@@ -37,7 +37,7 @@ pub const Plan = struct {
         const result = try allocator.alloc(u8, 48 + count * 32);
         @memset(request, 0);
         request[0] = 8;
-        request[2] = (surface.anchorFlags(0, false) >> 3) | @as(u8, if (builtin.mode == .Debug or builtin.mode == .ReleaseSafe) 2 else 0);
+        request[2] = (surface.anchorFlags(0, false) >> 3) | @as(u8, if (builtin.mode == .debug or builtin.mode == .safe) 2 else 0);
         request[3] = @as(u8, if (options.horizontal) 1 else 0) | @as(u8, if (options.vertical) 2 else 0) | @as(u8, if (options.grid) 4 else 0);
         std.mem.writeInt(u32, request[4..8], std.math.cast(u32, count) orelse @panic("virtual flow child count exceeds wire range"), .little);
         for ([_]usize{ options.first, options.declared, options.anchor, options.overscan, options.semantic, options.grid_rows }, 0..) |value, i| std.mem.writeInt(u64, request[8 + i * 8 ..][0..8], value, .little);

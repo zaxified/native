@@ -22,7 +22,7 @@ pub fn viewWindowIdFromJson(payload: []const u8, default_window_id: platform.Win
 }
 
 pub fn viewKindFromString(value: []const u8) ?platform.ViewKind {
-    inline for (@typeInfo(platform.ViewKind).@"enum".fields) |field| {
+    inline for (typeFields(@typeInfo(platform.ViewKind).@"enum")) |field| {
         if (std.mem.eql(u8, value, field.name)) return @field(platform.ViewKind, field.name);
     }
     if (std.mem.eql(u8, value, "titlebarAccessory")) return .titlebar_accessory;
@@ -37,7 +37,7 @@ pub fn viewKindFromString(value: []const u8) ?platform.ViewKind {
 }
 
 pub fn windowTitlebarStyleFromString(value: []const u8) ?platform.WindowTitlebarStyle {
-    inline for (@typeInfo(platform.WindowTitlebarStyle).@"enum".fields) |field| {
+    inline for (typeFields(@typeInfo(platform.WindowTitlebarStyle).@"enum")) |field| {
         if (std.mem.eql(u8, value, field.name)) return @field(platform.WindowTitlebarStyle, field.name);
     }
     if (std.mem.eql(u8, value, "hiddenInset")) return .hidden_inset;
@@ -69,42 +69,42 @@ pub fn gpuSurfaceOptionsFromJson(payload: []const u8, storage: *json.StringStora
 }
 
 fn gpuSurfaceBackendFromString(value: []const u8) ?platform.GpuSurfaceBackend {
-    inline for (@typeInfo(platform.GpuSurfaceBackend).@"enum".fields) |field| {
+    inline for (typeFields(@typeInfo(platform.GpuSurfaceBackend).@"enum")) |field| {
         if (std.mem.eql(u8, value, field.name)) return @field(platform.GpuSurfaceBackend, field.name);
     }
     return null;
 }
 
 fn gpuSurfacePixelFormatFromString(value: []const u8) ?platform.GpuSurfacePixelFormat {
-    inline for (@typeInfo(platform.GpuSurfacePixelFormat).@"enum".fields) |field| {
+    inline for (typeFields(@typeInfo(platform.GpuSurfacePixelFormat).@"enum")) |field| {
         if (std.mem.eql(u8, value, field.name)) return @field(platform.GpuSurfacePixelFormat, field.name);
     }
     return null;
 }
 
 fn gpuSurfacePresentModeFromString(value: []const u8) ?platform.GpuSurfacePresentMode {
-    inline for (@typeInfo(platform.GpuSurfacePresentMode).@"enum".fields) |field| {
+    inline for (typeFields(@typeInfo(platform.GpuSurfacePresentMode).@"enum")) |field| {
         if (std.mem.eql(u8, value, field.name)) return @field(platform.GpuSurfacePresentMode, field.name);
     }
     return null;
 }
 
 fn gpuSurfaceAlphaModeFromString(value: []const u8) ?platform.GpuSurfaceAlphaMode {
-    inline for (@typeInfo(platform.GpuSurfaceAlphaMode).@"enum".fields) |field| {
+    inline for (typeFields(@typeInfo(platform.GpuSurfaceAlphaMode).@"enum")) |field| {
         if (std.mem.eql(u8, value, field.name)) return @field(platform.GpuSurfaceAlphaMode, field.name);
     }
     return null;
 }
 
 fn gpuSurfaceColorSpaceFromString(value: []const u8) ?platform.GpuSurfaceColorSpace {
-    inline for (@typeInfo(platform.GpuSurfaceColorSpace).@"enum".fields) |field| {
+    inline for (typeFields(@typeInfo(platform.GpuSurfaceColorSpace).@"enum")) |field| {
         if (std.mem.eql(u8, value, field.name)) return @field(platform.GpuSurfaceColorSpace, field.name);
     }
     return null;
 }
 
 pub fn platformFeatureFromString(value: []const u8) ?platform.PlatformFeature {
-    inline for (@typeInfo(platform.PlatformFeature).@"enum".fields) |field| {
+    inline for (typeFields(@typeInfo(platform.PlatformFeature).@"enum")) |field| {
         if (std.mem.eql(u8, value, field.name)) return @field(platform.PlatformFeature, field.name);
     }
     if (std.mem.eql(u8, value, "mainWebView")) return .main_webview;
@@ -210,4 +210,42 @@ pub fn jsonIntegerField(payload: []const u8, field: []const u8) ?platform.Window
 
 pub fn jsonBoolField(payload: []const u8, field: []const u8) ?bool {
     return json.boolField(payload, field);
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

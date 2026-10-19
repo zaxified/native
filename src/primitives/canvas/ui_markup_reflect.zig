@@ -26,9 +26,9 @@ const schema = @import("ui_schema.zig");
 /// guard.
 pub fn typeScanQuota(comptime T: type) u32 {
     const entries: u32 = switch (@typeInfo(T)) {
-        .@"struct" => |info| @intCast(info.fields.len + info.decls.len),
-        .@"union" => |info| @intCast(info.fields.len + info.decls.len),
-        .@"enum" => |info| @intCast(info.fields.len + info.decls.len),
+        .@"struct" => |info| @intCast(typeFields(info).len + typeDecls(info).len),
+        .@"union" => |info| @intCast(typeFields(info).len + typeDecls(info).len),
+        .@"enum" => |info| @intCast(typeFields(info).len + typeDecls(info).len),
         else => 0,
     };
     return 2000 + entries * 64 + entries * entries;
@@ -60,7 +60,7 @@ pub fn isMarkdownImageItem(comptime Outer: type) bool {
     const Identity = Pointee(@FieldType(T, "image"));
     if (isImageNumber(Identity)) return true;
     if (@typeInfo(Identity) != .@"struct" or !@hasField(Identity, "imageLower") or !@hasField(Identity, "imageUpper")) return false;
-    return @typeInfo(Identity).@"struct".fields.len == 2 and isImageNumber(@FieldType(Identity, "imageLower")) and isImageNumber(@FieldType(Identity, "imageUpper"));
+    return typeFields(@typeInfo(Identity).@"struct").len == 2 and isImageNumber(@FieldType(Identity, "imageLower")) and isImageNumber(@FieldType(Identity, "imageUpper"));
 }
 
 fn isImageNumber(comptime T: type) bool {
@@ -164,11 +164,11 @@ pub fn declaredTextInputUnion(comptime T: type) bool {
         else => return false,
     };
     if (info.tag_type == null) return false;
-    if (info.fields.len != text_input_event_tags.len) return false;
+    if (typeFields(info).len != text_input_event_tags.len) return false;
     inline for (text_input_event_tags) |tag| {
         if (!@hasField(T, tag)) return false;
     }
-    inline for (info.fields) |field| {
+    inline for (typeFields(info)) |field| {
         if (comptime std.mem.eql(u8, field.name, "insert_text")) {
             if (!isBytes(field.type)) return false;
         } else if (comptime std.mem.eql(u8, field.name, "move_caret")) {
@@ -234,7 +234,7 @@ fn declaredRecordMatchesVocabulary(comptime T: type, comptime canvas_names: []co
         .@"struct" => |s| s,
         else => return false,
     };
-    if (info.fields.len != canvas_names.len) return false;
+    if (typeFields(info).len != canvas_names.len) return false;
     const canvas_spelling = comptime blk: {
         for (canvas_names) |name| {
             if (!@hasField(T, name)) break :blk false;
@@ -248,7 +248,7 @@ fn declaredRecordMatchesVocabulary(comptime T: type, comptime canvas_names: []co
         break :blk true;
     };
     if (!canvas_spelling and !ts_spelling) return false;
-    inline for (info.fields) |field| {
+    inline for (typeFields(info)) |field| {
         if (!isNumeric(field.type)) return false;
     }
     return true;
@@ -289,7 +289,7 @@ pub fn declaredWidgetDragDropRecord(comptime T: type) bool {
         .@"struct" => |s| s,
         else => return false,
     };
-    if (info.fields.len != 6) return false;
+    if (typeFields(info).len != 6) return false;
     if (!@hasField(T, "sourceId") or !@hasField(T, "phase") or !@hasField(T, "x") or !@hasField(T, "y") or
         !@hasField(T, "viewWidth") or !@hasField(T, "viewHeight")) return false;
     if (!isNumeric(@FieldType(T, "sourceId"))) return false;
@@ -368,14 +368,14 @@ fn isCaretMoveRecord(comptime T: type) bool {
         .@"struct" => |s| s,
         else => return false,
     };
-    if (info.fields.len != 2) return false;
+    if (typeFields(info).len != 2) return false;
     if (!@hasField(T, "direction") or !@hasField(T, "extend")) return false;
-    inline for (info.fields) |field| {
+    inline for (typeFields(info)) |field| {
         if (comptime std.mem.eql(u8, field.name, "extend")) {
             if (field.type != bool) return false;
         } else {
             const members = switch (@typeInfo(field.type)) {
-                .@"enum" => |e| e.fields,
+                .@"enum" => |e| typeFields(e),
                 else => return false,
             };
             if (members.len != text_caret_direction_members.len) return false;
@@ -392,12 +392,12 @@ fn isSelectionRecord(comptime T: type) bool {
         .@"struct" => |s| s,
         else => return false,
     };
-    if (info.fields.len != 2 and info.fields.len != 3) return false;
+    if (typeFields(info).len != 2 and typeFields(info).len != 3) return false;
     if (!@hasField(T, "anchor") or !@hasField(T, "focus")) return false;
-    inline for (info.fields) |field| {
+    inline for (typeFields(info)) |field| {
         if (comptime std.mem.eql(u8, field.name, "affinity")) {
             const members = switch (@typeInfo(field.type)) {
-                .@"enum" => |e| e.fields,
+                .@"enum" => |e| typeFields(e),
                 else => return false,
             };
             if (members.len != text_caret_affinity_members.len) return false;
@@ -408,7 +408,7 @@ fn isSelectionRecord(comptime T: type) bool {
             return false;
         }
     }
-    if (info.fields.len == 3 and !@hasField(T, "affinity")) return false;
+    if (typeFields(info).len == 3 and !@hasField(T, "affinity")) return false;
     return true;
 }
 
@@ -417,9 +417,9 @@ fn isCompositionRecord(comptime T: type) bool {
         .@"struct" => |s| s,
         else => return false,
     };
-    if (info.fields.len != 2) return false;
+    if (typeFields(info).len != 2) return false;
     if (!@hasField(T, "text") or !@hasField(T, "cursor")) return false;
-    inline for (info.fields) |field| {
+    inline for (typeFields(info)) |field| {
         if (comptime std.mem.eql(u8, field.name, "text")) {
             if (!isBytes(field.type)) return false;
         } else {
@@ -488,7 +488,7 @@ pub fn literalValueForAttribute(text: []const u8, attribute_name: []const u8) ex
 pub fn declaredVirtualListRange(comptime T: type) bool {
     if (@typeInfo(T) != .@"struct") return false;
     const names = .{ "start_index", "end_index", "first_visible_index", "last_visible_index", "item_extent", "item_gap", "scroll_offset", "layout_offset", "content_extent", "before_extent", "after_extent", "anchor_extent" };
-    if (@typeInfo(T).@"struct".fields.len != names.len) return false;
+    if (typeFields(@typeInfo(T).@"struct").len != names.len) return false;
     inline for (names, 0..) |name, index| {
         if (!@hasField(T, name)) return false;
         if (index < 4) {
@@ -504,4 +504,54 @@ pub fn isVirtualItemFn(comptime Model: type, comptime DeclType: type) bool {
     if ((info.params.len != 2 and info.params.len != 3) or info.params[0].type != *const Model or info.params[1].type == null or info.return_type == null) return false;
     if (info.params.len == 3 and info.params[2].type != std.mem.Allocator) return false;
     return declaredVirtualListRange(Pointee(info.params[1].type.?)) and sliceElement(info.return_type.?) != null;
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
+}
+
+const TypeDecl = struct { name: [:0]const u8 };
+
+inline fn typeDecls(comptime info: anytype) []const TypeDecl {
+    const result = comptime blk: {
+        var out: [info.decl_names.len]TypeDecl = undefined;
+        for (info.decl_names, 0..) |n, i| out[i] = .{ .name = n };
+        const final = out;
+        break :blk final;
+    };
+    return &result;
 }

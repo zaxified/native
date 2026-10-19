@@ -110,7 +110,7 @@ fn color(bytes: []const u8, at: usize) drawing.Color {
 }
 pub fn paint(id: u64, first_slot: u64, index: u64, current: drawing.Color, style: svg.IconStyle, stroke_phase: bool, tokens: Tokens) Paint {
     var request: [96]u8 = @splat(0);
-    request[0..8].* = .{ 48, 1, 1, tag(style.fill), tag(style.stroke), @intFromEnum(style.linecap), @intFromBool(builtin.mode == .Debug or builtin.mode == .ReleaseSafe), @intFromBool(stroke_phase) };
+    request[0..8].* = .{ 48, 1, 1, tag(style.fill), tag(style.stroke), @intFromEnum(style.linecap), @intFromBool(builtin.mode == .debug or builtin.mode == .safe), @intFromBool(stroke_phase) };
     word(&request, 8, id);
     word(&request, 16, first_slot);
     word(&request, 24, index);

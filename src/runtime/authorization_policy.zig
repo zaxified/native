@@ -55,8 +55,9 @@ pub const Program = struct {
 };
 pub fn hasPermission(policy: ?Policy, grants: []const []const u8, permission: []const u8) bool {
     const compiled = policy orelse return security.hasPermission(grants, permission);
-    var storage = std.heap.stackFallback(4096, std.heap.page_allocator);
-    var packet = Packet.init(storage.get(), .permission, @splat(0));
+    var storage_buf: [4096]u8 = undefined;
+    var storage = std.heap.BufferFirstAllocator.init(&storage_buf, std.heap.page_allocator);
+    var packet = Packet.init(storage.allocator(), .permission, @splat(0));
     defer packet.writer.deinit();
     packet.list(grants);
     packet.field(permission);
@@ -64,8 +65,9 @@ pub fn hasPermission(policy: ?Policy, grants: []const []const u8, permission: []
 }
 pub fn hasPermissions(policy: ?Policy, grants: []const []const u8, required: []const []const u8) bool {
     const compiled = policy orelse return security.hasPermissions(grants, required);
-    var storage = std.heap.stackFallback(4096, std.heap.page_allocator);
-    var packet = Packet.init(storage.get(), .permissions, @splat(0));
+    var storage_buf: [4096]u8 = undefined;
+    var storage = std.heap.BufferFirstAllocator.init(&storage_buf, std.heap.page_allocator);
+    var packet = Packet.init(storage.allocator(), .permissions, @splat(0));
     defer packet.writer.deinit();
     packet.list(grants);
     packet.list(required);
@@ -73,8 +75,9 @@ pub fn hasPermissions(policy: ?Policy, grants: []const []const u8, required: []c
 }
 pub fn allowsOrigin(policy: ?Policy, allowed: []const []const u8, origin: []const u8) bool {
     const compiled = policy orelse return security.allowsOrigin(allowed, origin);
-    var storage = std.heap.stackFallback(4096, std.heap.page_allocator);
-    var packet = Packet.init(storage.get(), .origin, @splat(0));
+    var storage_buf: [4096]u8 = undefined;
+    var storage = std.heap.BufferFirstAllocator.init(&storage_buf, std.heap.page_allocator);
+    var packet = Packet.init(storage.allocator(), .origin, @splat(0));
     defer packet.writer.deinit();
     packet.list(allowed);
     packet.field(origin);
@@ -82,8 +85,9 @@ pub fn allowsOrigin(policy: ?Policy, allowed: []const []const u8, origin: []cons
 }
 pub fn allowsExternalUrl(policy: ?Policy, value: security.ExternalLinkPolicy, url: []const u8) bool {
     const compiled = policy orelse return security.allowsExternalUrl(value, url);
-    var storage = std.heap.stackFallback(4096, std.heap.page_allocator);
-    var packet = Packet.init(storage.get(), .external, .{ @intFromBool(value.action == .open_system_browser), 0, 0, 0 });
+    var storage_buf: [4096]u8 = undefined;
+    var storage = std.heap.BufferFirstAllocator.init(&storage_buf, std.heap.page_allocator);
+    var packet = Packet.init(storage.allocator(), .external, .{ @intFromBool(value.action == .open_system_browser), 0, 0, 0 });
     defer packet.writer.deinit();
     packet.list(value.allowed_urls);
     packet.field(url);
@@ -91,8 +95,9 @@ pub fn allowsExternalUrl(policy: ?Policy, value: security.ExternalLinkPolicy, ur
 }
 pub fn bridgeAllows(policy: ?Policy, value: bridge.Policy, command: []const u8, origin: []const u8) bool {
     const compiled = policy orelse return value.allows(command, origin);
-    var storage = std.heap.stackFallback(4096, std.heap.page_allocator);
-    var packet = Packet.init(storage.get(), .bridge_command, .{ @intFromBool(value.enabled), 0, 0, 0 });
+    var storage_buf: [4096]u8 = undefined;
+    var storage = std.heap.BufferFirstAllocator.init(&storage_buf, std.heap.page_allocator);
+    var packet = Packet.init(storage.allocator(), .bridge_command, .{ @intFromBool(value.enabled), 0, 0, 0 });
     defer packet.writer.deinit();
     packet.list(value.permissions);
     packet.commands(value.commands);
@@ -101,8 +106,9 @@ pub fn bridgeAllows(policy: ?Policy, value: bridge.Policy, command: []const u8, 
     return packet.finish(compiled).allowed();
 }
 pub fn builtinAllows(policy: Policy, value: bridge.Policy, navigation: security.Policy, js_window_api: bool, command: []const u8, origin: []const u8, permission: ?[]const u8) bool {
-    var storage = std.heap.stackFallback(4096, std.heap.page_allocator);
-    var packet = Packet.init(storage.get(), .builtin, .{ @intFromBool(value.enabled), @intFromBool(js_window_api), @intFromBool(permission != null), 0 });
+    var storage_buf: [4096]u8 = undefined;
+    var storage = std.heap.BufferFirstAllocator.init(&storage_buf, std.heap.page_allocator);
+    var packet = Packet.init(storage.allocator(), .builtin, .{ @intFromBool(value.enabled), @intFromBool(js_window_api), @intFromBool(permission != null), 0 });
     defer packet.writer.deinit();
     packet.list(navigation.permissions);
     packet.list(value.permissions);
@@ -122,8 +128,9 @@ pub fn validateExternalUrl(policy: ?Policy, value: security.ExternalLinkPolicy, 
         if (!security.allowsExternalUrl(value, url)) return error.NavigationDenied;
         return;
     };
-    var storage = std.heap.stackFallback(4096, std.heap.page_allocator);
-    var packet = Packet.init(storage.get(), .external_admission, .{ @intFromBool(value.action == .open_system_browser), 0, 0, 0 });
+    var storage_buf: [4096]u8 = undefined;
+    var storage = std.heap.BufferFirstAllocator.init(&storage_buf, std.heap.page_allocator);
+    var packet = Packet.init(storage.allocator(), .external_admission, .{ @intFromBool(value.action == .open_system_browser), 0, 0, 0 });
     defer packet.writer.deinit();
     packet.list(value.allowed_urls);
     packet.field(url);

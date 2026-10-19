@@ -209,7 +209,15 @@ pub fn RuntimeFlow(comptime Runtime: type) type {
                     else => unreachable,
                 };
             }
-            errdefer |err| if (host_flow.gate(policy, 9, kind, 0) != 0) recordDispatchError(self, "app_start", err);
+            // Zig 0.17 removed `errdefer |err|`; the rest of the dispatch runs in
+            // dispatchPlatformEventPlanned and a failure is recorded here instead.
+            dispatchPlatformEventPlanned(self, app, event_value, policy, kind) catch |err| {
+                if (host_flow.gate(policy, 9, kind, 0) != 0) recordDispatchError(self, "app_start", err);
+                return err;
+            };
+        }
+
+        fn dispatchPlatformEventPlanned(self: *Runtime, app: App, event_value: platform.Event, policy: anytype, kind: anytype) anyerror!void {
             const program = host_flow.plan(policy, .platform_event, .{ .kind = kind });
             var scene_value: ?app_manifest.ShellConfig = null;
             var was_open = false;

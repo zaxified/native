@@ -94,7 +94,7 @@ test "compiled retained edits preserve exact keys fingerprints ordered clusters 
 }
 const Storage = @import("render_cache_e2e_tests.zig").Storage;
 const frameEqual = @import("render_cache_e2e_tests.zig").frameEqual;
-var calls: [4]usize = .{0} ** 4;
+var calls: [4]usize = @splat(0);
 var request_pointer: ?[*]const u8 = null;
 var result_pointer: ?[*]u8 = null;
 var shared = true;
@@ -107,7 +107,7 @@ fn observed(request: []const u8, result: []u8) usize {
     return core.nativeWindowPolicy(request, result);
 }
 fn reset() void {
-    calls = .{0} ** 4;
+    calls = @splat(0);
     request_pointer = null;
     result_pointer = null;
     shared = true;
@@ -145,7 +145,7 @@ test "diagnostic damage full frames blur footprints and earliest errors match th
     reset();
     try std.testing.expectError(error.DiffListFull, lists[0].framePlan(old, .{}, limited_a));
     try std.testing.expectError(error.DiffListFull, lists[0].framePlan(old, .{ .render_damage_policy = observed }, limited_b));
-    try exact([_]usize{0} ** 4, calls);
+    try exact(@as([4]usize, @splat(0)), calls);
     inline for (@typeInfo(canvas.CanvasFrameStorage).@"struct".fields) |field| try exact(@field(a.value, field.name), @field(b.value, field.name));
 }
 extern fn nsc_core_native_view(out: *[*]const u8, len: *usize) callconv(.c) void;
@@ -169,7 +169,7 @@ test "damage copied calls preserve borrowed model view and shared native buffers
     var stable: [1]bool = undefined;
     var upsert: [1]bool = undefined;
     const patch = policy.patch(&.{9007199254740993}, &.{0}, &.{.init(10, 20, 4, 6)}, &current, &matched, &stable, &upsert, core.nativeWindowPolicy, &workspace).?;
-    var rects = [_]geometry.RectF{sentinel} ** canvas.max_canvas_frame_dirty_rects;
+    var rects = @as([canvas.max_canvas_frame_dirty_rects]geometry.RectF, @splat(sentinel));
     _ = policy.finalize(.{ .presentation = true, .full_repaint = false, .surface_size = .init(800, 600), .scale = 1.3, .render_bounds = .init(0, 0, 800, 600), .refinement = patch }, &.{}, &.{}, &rects, core.nativeWindowPolicy, &workspace);
     try std.testing.expectEqualSlices(u8, saved, borrowed);
     try std.testing.expectEqualSlices(u8, saved_view, view[0..length]);

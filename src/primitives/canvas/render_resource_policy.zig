@@ -37,7 +37,7 @@ fn readOptionalId(bytes: []const u8, flag: usize, at: usize) ?u64 {
 }
 fn numericRules() u8 {
     const builtin = @import("builtin");
-    const shadow: u8 = if ((builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .x86) and builtin.mode != .Debug) 16 else 0;
+    const shadow: u8 = if ((builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .x86) and builtin.mode != .debug) 16 else 0;
     return shadow | @import("render_plan_policy.zig").numericFlags();
 }
 

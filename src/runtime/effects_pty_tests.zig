@@ -118,7 +118,7 @@ test "pty admission: every refused spawn delivers exactly one rejected exit" {
     _ = try expectExit(&fx, 2, .rejected);
 
     // argv over the byte budget.
-    const big = "y" ** (effects_mod.max_effect_argv_bytes + 1);
+    const big = strRepeat("y", effects_mod.max_effect_argv_bytes + 1);
     fx.ptySpawn(.{ .key = 3, .argv = &.{big}, .on_event = DirectFx.ptyMsg(.pty) });
     _ = try expectExit(&fx, 3, .rejected);
 
@@ -127,7 +127,7 @@ test "pty admission: every refused spawn delivers exactly one rejected exit" {
     _ = try expectExit(&fx, 4, .rejected);
 
     // TERM over its bound.
-    const long_term = "t" ** (effects_mod.max_effect_pty_term_bytes + 1);
+    const long_term = strRepeat("t", effects_mod.max_effect_pty_term_bytes + 1);
     fx.ptySpawn(.{ .key = 5, .argv = &.{"sh"}, .term = long_term, .on_event = DirectFx.ptyMsg(.pty) });
     _ = try expectExit(&fx, 5, .rejected);
 
@@ -158,7 +158,7 @@ test "fake pty write capture, resize mirror, and kill mirror" {
     try testing.expectEqualStrings("ls -la\r", fx.ptyWrittenBytes(11));
 
     // Over-bound single write: refused whole (returns false), never a cut.
-    const oversized = "z" ** (effects_mod.max_effect_pty_write_bytes + 1);
+    const oversized = strRepeat("z", effects_mod.max_effect_pty_write_bytes + 1);
     try testing.expect(!fx.ptyWrite(11, oversized));
     try testing.expectEqualStrings("ls -la\r", fx.ptyWrittenBytes(11));
 
@@ -1130,7 +1130,7 @@ fn ptySessionUpdate(model: *PtySessionModel, msg: PtySessionMsg, fx: *PtySession
         // model and the fingerprint.
         .type_oversized => model.recordWriteVerdict(fx.ptyWrite(
             session_pty_key,
-            &(comptime [_]u8{'z'} ** (effects_mod.max_effect_pty_write_bytes + 1)),
+            &(comptime @as([effects_mod.max_effect_pty_write_bytes + 1]u8, @splat('z'))),
         )),
         .event => |event| model.record(event),
     }
@@ -1359,4 +1359,16 @@ test "replay without the blob store refuses a pty output record loudly" {
         .require_same_platform = false,
     });
     try testing.expectError(error.ReplayMissingBlob, result);
+}
+
+/// Comptime string repetition; replaces the `**` operator removed in Zig 0.17.
+inline fn strRepeat(comptime s: []const u8, comptime n: usize) *const [s.len * n:0]u8 {
+    const rep_result = comptime blk: {
+        @setEvalBranchQuota(n * (s.len + 4) + 1000);
+        var buf: [s.len * n:0]u8 = undefined;
+        for (0..n) |i| @memcpy(buf[i * s.len ..][0..s.len], s);
+        const rep_final = buf;
+        break :blk rep_final;
+    };
+    return &rep_result;
 }

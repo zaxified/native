@@ -48,7 +48,7 @@ const ui_log = std.log.scoped(.zero_canvas_ui);
 /// Markup views get the same lesson as a validation/compile error
 /// (`ui_markup.stack_container_gap_message`).
 fn warnStackContainerGap(kind: WidgetKind, gap: f32) void {
-    if (builtin.mode != .Debug) return;
+    if (builtin.mode != .debug) return;
     if (gap == 0 or !canvas.widgetKindStacksChildren(kind)) return;
     ui_log.warn(
         "gap does nothing on {s}: this container layers its children on top of each other - wrap them in a column (or row) inside it for flow, or drop the gap",
@@ -64,7 +64,7 @@ fn warnStackContainerGap(kind: WidgetKind, gap: f32) void {
 /// keep building; the runtime behavior (vertical scrolling, offset
 /// ignored) is well-defined either way.
 fn warnInertScrollAxis(kind: WidgetKind, options: ElementOptionsShape) void {
-    if (builtin.mode != .Debug) return;
+    if (builtin.mode != .debug) return;
     if (kind != .scroll_view) return;
     if (options.virtualized and options.axis != .vertical) {
         ui_log.warn(
@@ -98,7 +98,7 @@ const ElementOptionsShape = struct {
 /// Markup views get the same lesson as a validation error
 /// (`ui_markup.wrap_element_message`).
 fn warnInertWrap(kind: WidgetKind, wrap: ?bool) void {
-    if (builtin.mode != .Debug) return;
+    if (builtin.mode != .debug) return;
     if (wrap == null) return;
     // Plain text leaves wrap for real; span paragraphs already wrap by
     // design, so the option is redundant there, not a trap.
@@ -117,7 +117,7 @@ fn warnInertWrap(kind: WidgetKind, wrap: ?bool) void {
 /// is inert, not harmful); markup views get the same lesson as a
 /// validation/compile error (`ui_markup.text_size_element_message`).
 fn warnTextSizeKind(kind: WidgetKind, size: canvas.WidgetSize) void {
-    if (builtin.mode != .Debug) return;
+    if (builtin.mode != .debug) return;
     if (kind == .text) return;
     if (size != .heading and size != .display) return;
     ui_log.warn(
@@ -143,7 +143,7 @@ fn warnTextSizeKind(kind: WidgetKind, size: canvas.WidgetSize) void {
 /// `logAxisChildrenOverflow` precedent) because a .warn inside a
 /// test-built view would fail the whole suite for a rendering nit.
 fn warnUncoveredText(kind: WidgetKind, text: []const u8) void {
-    if (builtin.mode != .Debug) return;
+    if (builtin.mode != .debug) return;
     var index: usize = 0;
     while (index < text.len) {
         const len = std.unicode.utf8ByteSequenceLength(text[index]) catch return;
@@ -169,7 +169,7 @@ fn warnUncoveredText(kind: WidgetKind, text: []const u8) void {
 /// (the shipped-app rule); literal markup names were already proven at
 /// build time and never reach here.
 fn warnUnknownIconName(name: []const u8) void {
-    if (builtin.mode != .Debug) return;
+    if (builtin.mode != .debug) return;
     if (name.len == 0 or canvas.icons.resolve(name) != null) return;
     ui_log.warn(
         "unknown icon \"{s}\": not a built-in (canvas.icons.known_icon_names) and not registered via canvas.icons.registerAppIcons - the missing-icon fallback (a slashed circle) draws in its place",
@@ -182,7 +182,7 @@ fn warnUnknownIconName(name: []const u8) void {
 /// markup validator teaches the same rule as a hard error; the builder
 /// warns and keeps building (the shipped-app rule).
 fn warnDismissHandlerKind(kind: WidgetKind) void {
-    if (builtin.mode != .Debug) return;
+    if (builtin.mode != .debug) return;
     if (canvas.widgetKindDismissibleSurface(kind)) return;
     ui_log.warn(
         "on_dismiss never fires on {s}: only dismissible surfaces (dialog, drawer, sheet, popover, menu_surface, dropdown_menu) are closed by Escape/click-outside - put it on the surface element",
@@ -196,7 +196,7 @@ fn warnDismissHandlerKind(kind: WidgetKind) void {
 /// the same rule as a hard error; the builder warns and keeps building
 /// (the shipped-app rule).
 fn warnResizeHandlerKind(kind: WidgetKind) void {
-    if (builtin.mode != .Debug) return;
+    if (builtin.mode != .debug) return;
     if (kind == .split) return;
     ui_log.warn(
         "on_resize never fires on {s}: only split containers dispatch fraction changes - put it on the split element",
@@ -453,7 +453,7 @@ pub fn Ui(comptime Msg: type) type {
         virtual_extent_policy: ?@import("virtual_extent_policy.zig").Policy = null,
         /// The windowed virtual lists this build declared (`virtualList`),
         /// for the app loop's coverage check and scroll re-derivation.
-        virtual_window_records: [max_virtual_windows]VirtualWindowRecord = [_]VirtualWindowRecord{.{}} ** max_virtual_windows,
+        virtual_window_records: [max_virtual_windows]VirtualWindowRecord = @as([max_virtual_windows]VirtualWindowRecord, @splat(.{})),
         virtual_window_record_count: usize = 0,
         /// Widget provenance collector (write-back's read half): when set,
         /// the markup engines stamp each built node's source, and
@@ -1177,7 +1177,7 @@ pub fn Ui(comptime Msg: type) type {
 
                 fn make(scroll_state: canvas.ScrollState) Msg {
                     var payload: Payload = undefined;
-                    inline for (@typeInfo(Payload).@"struct".fields) |field| {
+                    inline for (typeFields(@typeInfo(Payload).@"struct")) |field| {
                         @field(payload, field.name) = num(field.type, @field(scroll_state, sourceName(field.name)));
                     }
                     return @unionInit(Msg, @tagName(tag), payload);
@@ -1219,7 +1219,7 @@ pub fn Ui(comptime Msg: type) type {
 
                 fn make(state: canvas.TerminalState) Msg {
                     var payload: Payload = undefined;
-                    inline for (@typeInfo(Payload).@"struct".fields) |field| {
+                    inline for (typeFields(@typeInfo(Payload).@"struct")) |field| {
                         @field(payload, field.name) = num(field.type, @field(state, field.name));
                     }
                     return @unionInit(Msg, @tagName(tag), payload);
@@ -1992,7 +1992,7 @@ pub fn Ui(comptime Msg: type) type {
 
         fn recordVirtualWindow(self: *Self, record: VirtualWindowRecord) void {
             if (self.virtual_window_record_count >= self.virtual_window_records.len) {
-                if (builtin.mode == .Debug) {
+                if (builtin.mode == .debug) {
                     ui_log.warn(
                         "more than {d} virtual lists in one build (canvas.ui_builder.max_virtual_windows) - the excess scrolls but skips the app loop's window coverage check",
                         .{max_virtual_windows},
@@ -4110,4 +4110,42 @@ fn structuralId(parent_id: ObjectId, kind: WidgetKind, key: UiKey) ObjectId {
     }
     const value = hasher.final();
     return if (value == 0) zero_id_fallback else value;
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

@@ -11,7 +11,7 @@ const TerminalGrid = model.TerminalGrid;
 const TerminalRow = model.TerminalRow;
 const TerminalCell = model.TerminalCell;
 const advance_probe_len = 16;
-const advance_probe = "M" ** advance_probe_len;
+const advance_probe = strRepeat("M", advance_probe_len);
 const max_cols = model.max_cols;
 const max_rows = model.max_rows;
 const max_cells = model.max_cells;
@@ -706,4 +706,16 @@ pub fn paint(grid: TerminalGrid, builder: *canvas.Builder, options: TerminalPain
         }
     }
     try builder.popClip();
+}
+
+/// Comptime string repetition; replaces the `**` operator removed in Zig 0.17.
+inline fn strRepeat(comptime s: []const u8, comptime n: usize) *const [s.len * n:0]u8 {
+    const rep_result = comptime blk: {
+        @setEvalBranchQuota(n * (s.len + 4) + 1000);
+        var buf: [s.len * n:0]u8 = undefined;
+        for (0..n) |i| @memcpy(buf[i * s.len ..][0..s.len], s);
+        const rep_final = buf;
+        break :blk rep_final;
+    };
+    return &rep_result;
 }

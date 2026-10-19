@@ -190,7 +190,7 @@ fn enumField(comptime E: type, comptime value: []const u8, comptime what: []cons
         // enum-mapped manifest field pays a full comptime pdq sort out of
         // the shared budget. A linear name scan is a handful of branches
         // per member (length short-circuit first) and needs no map.
-        for (@typeInfo(E).@"enum".fields) |field| {
+        for (typeFields(@typeInfo(E).@"enum")) |field| {
             if (std.mem.eql(u8, field.name, value)) return @field(E, field.name);
         }
         @compileError("unknown app.zon " ++ what ++ " \"" ++ value ++ "\" - expected one of: " ++ memberList(E));
@@ -200,7 +200,7 @@ fn enumField(comptime E: type, comptime value: []const u8, comptime what: []cons
 fn memberList(comptime E: type) []const u8 {
     comptime {
         var out: []const u8 = "";
-        for (@typeInfo(E).@"enum".fields, 0..) |field, index| {
+        for (typeFields(@typeInfo(E).@"enum"), 0..) |field, index| {
             out = out ++ (if (index == 0) "" else ", ") ++ field.name;
         }
         return out;
@@ -349,4 +349,42 @@ test "shellConfigFrom converts a rich scene without exhausting the branch quota"
     try std.testing.expectEqual(@as(usize, 3), scene.chrome.tabs.len);
     try std.testing.expectEqualStrings("go", scene.chrome.primary_action.?.id);
     try std.testing.expectEqualStrings("surface", comptime firstGpuSurfaceLabel(scene));
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

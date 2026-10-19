@@ -321,7 +321,7 @@ pub const WindowsPlatform = struct {
     /// `createWithOptions` and retire it through `destroy`, the
     /// latch-gated free.
     channel_wake_abandoned: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
-    audio_capture_sinks: [2]platform_mod.AudioCaptureSink = [_]platform_mod.AudioCaptureSink{.{}} ** 2,
+    audio_capture_sinks: [2]platform_mod.AudioCaptureSink = @as([2]platform_mod.AudioCaptureSink, @splat(.{})),
 
     pub fn init(title: []const u8, size: geometry.SizeF) Error!WindowsPlatform {
         return initWithEngine(title, size, .system);

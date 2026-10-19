@@ -2106,7 +2106,7 @@ const semantic_action_fields = [_][]const u8{
     "set_selection", "select", "drag",   "drop_files", "dismiss",
 };
 comptime {
-    if (@typeInfo(WidgetActions).@"struct".fields.len != semantic_action_fields.len)
+    if (typeFields(@typeInfo(WidgetActions).@"struct").len != semantic_action_fields.len)
         @compileError("update the compiled semantic action protocol for new actions");
 }
 
@@ -2218,4 +2218,42 @@ test "sanitizedSingleLineTextInputEvent sanitizes inserts above the former 64 Ki
     const sanitized = sanitizedSingleLineTextInputEvent(.text_field, .{ .insert_text = input }).?;
     try testing.expectEqual(@as(usize, input.len - 1), sanitized.insert_text.len);
     try testing.expect(std.mem.indexOfAny(u8, sanitized.insert_text, "\r\n") == null);
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

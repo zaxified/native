@@ -357,5 +357,17 @@ test "screenshot file names stay inside the automation directory" {
     try std.testing.expectEqualStrings("screenshot-..-evil.png", try screenshotFileName("../evil", &buffer));
     try std.testing.expectEqualStrings("screenshot-a-b.png", try screenshotFileName("a/b", &buffer));
     try std.testing.expectError(error.InvalidCommand, screenshotFileName("", &buffer));
-    try std.testing.expectError(error.CommandTooLarge, screenshotFileName("x" ** 65, &buffer));
+    try std.testing.expectError(error.CommandTooLarge, screenshotFileName(strRepeat("x", 65), &buffer));
+}
+
+/// Comptime string repetition; replaces the `**` operator removed in Zig 0.17.
+inline fn strRepeat(comptime s: []const u8, comptime n: usize) *const [s.len * n:0]u8 {
+    const rep_result = comptime blk: {
+        @setEvalBranchQuota(n * (s.len + 4) + 1000);
+        var buf: [s.len * n:0]u8 = undefined;
+        for (0..n) |i| @memcpy(buf[i * s.len ..][0..s.len], s);
+        const rep_final = buf;
+        break :blk rep_final;
+    };
+    return &rep_result;
 }

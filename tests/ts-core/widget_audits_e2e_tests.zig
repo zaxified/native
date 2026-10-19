@@ -202,8 +202,8 @@ fn malformed(request: []const u8, output: []u8) usize {
 }
 test "compiled widget audits reject invalid complete results before modifying caller storage" {
     var nodes = [_]canvas.WidgetLayoutNode{ node(.{ .kind = .row }, window, null), node(.{ .kind = .button, .id = 1 }, .init(0, 0, 10, 10), 0) };
-    var a11y = [_]canvas.a11y.A11yAuditFinding{.{ .rule = .missing_label, .node_index = 999 }} ** 8;
-    var layout = [_]canvas.LayoutAuditFinding{.{ .rule = .text_overflow, .node_index = 999, .overrun_x = 33 }} ** 8;
+    var a11y = @as([8]canvas.a11y.A11yAuditFinding, @splat(.{ .rule = .missing_label, .node_index = 999 }));
+    var layout = @as([8]canvas.LayoutAuditFinding, @splat(.{ .rule = .text_overflow, .node_index = 999, .overrun_x = 33 }));
     const a = a11y;
     const b = layout;
     for (0..12) |case| {

@@ -11,7 +11,7 @@ const readFloat = wire.readFloat;
 const builtin = @import("builtin");
 // Zig 0.16 optimized x86 preserves the shadow output's zero operand. The
 // separately lowered backdrop-blur output canonicalizes that clamp to +0.
-const nonnegative_zero: u8 = if ((builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .x86) and builtin.mode != .Debug) 16 else 0;
+const nonnegative_zero: u8 = if ((builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .x86) and builtin.mode != .debug) 16 else 0;
 const zero_rules: u8 = nonnegative_zero | switch (builtin.cpu.arch) {
     .aarch64, .aarch64_be => 3,
     else => 5,

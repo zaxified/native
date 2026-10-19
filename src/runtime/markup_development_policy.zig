@@ -59,7 +59,7 @@ pub fn reload(callback: *const fn ([]const u8, []u8) usize, kind: u8, changed: b
             ended = true;
             continue;
         }
-        if (ended or value >= std.meta.fields(Action).len or failed and value != 1 and value != 2 or !failed and value == 2 or kind != 2 and value >= 7 or kind == 2 and value >= 4 and value <= 6 or value == 6 and !installed or value == 7 and !baseline or value == 8 and baseline) @panic("invalid markup reload action");
+        if (ended or value >= typeFieldsOf(Action).len or failed and value != 1 and value != 2 or !failed and value == 2 or kind != 2 and value >= 7 or kind == 2 and value >= 4 and value <= 6 or value == 6 and !installed or value == 7 and !baseline or value == 8 and baseline) @panic("invalid markup reload action");
     }
     if (!ended) @panic("unterminated markup reload program");
     return output;
@@ -88,4 +88,42 @@ pub fn stripPrefix(callback: *const fn ([]const u8, []u8) usize, prefix: []const
     const start = word(result, 0);
     if (start > path.len or start != 0 and (prefix.len >= path.len or start != prefix.len + 1)) @panic("invalid markup path bounds");
     return path[start..];
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

@@ -250,7 +250,7 @@ test "a grapheme cluster the emulator holds paints whole - down to the last mark
     // grapheme storage bounds a cluster at roughly 256 scalars; the
     // scratch stays store-sized so larger clusters keep painting whole
     // as that bound moves.)
-    const cluster = "a" ++ ("\u{0301}" ** 200) ++ "\u{20DD}";
+    const cluster = "a" ++ (strRepeat("\u{0301}", 200)) ++ "\u{20DD}";
     session.feed(cluster);
 
     var commands: [512]canvas.CanvasCommand = undefined;
@@ -280,7 +280,7 @@ test "a concealed row never blanks the rows painted after it" {
     defer session.destroy();
     // Row 0: sixty concealed cells (SGR 8) — painting emits NO text for
     // them. Row 1: ordinary visible text.
-    session.feed("\x1b[8m" ++ ("x" ** 60) ++ "\x1b[0m\r\nvisible\r\n");
+    session.feed("\x1b[8m" ++ (strRepeat("x", 60)) ++ "\x1b[0m\r\nvisible\r\n");
 
     var commands: [512]canvas.CanvasCommand = undefined;
     var builder = canvas.Builder.init(&commands);
@@ -1129,7 +1129,7 @@ test "retained replies keep accumulating while further output feeds - the buffer
     // clearing or dropping would strand a child blocked on an answer.
     app_state.effects.fake_pty_write_full = true;
     app_state.model.outbound_len = app_state.model.outbound_buffer.len;
-    const burst = "\x1b[6n" ** 6000; // ~36 KiB of replies, > 16 KiB initial
+    const burst = strRepeat("\x1b[6n", 6000); // ~36 KiB of replies, > 16 KiB initial
     session.feed(burst);
     app.moveResponsesToOutbound(&app_state.model, &app_state.effects);
     try testing.expectEqual(@as(u32, 0), session.responses_dropped);
@@ -1823,4 +1823,16 @@ test "a recorded terminal session replays byte-identical offline - no shell pres
     defer gpa.free(screen);
     try testing.expectEqualStrings(recorded.screen[0..recorded.screen_len], screen[0..recorded.screen_len]);
     try testing.expectEqual(app.Phase.ended, app_state.model.phase);
+}
+
+/// Comptime string repetition; replaces the `**` operator removed in Zig 0.17.
+inline fn strRepeat(comptime s: []const u8, comptime n: usize) *const [s.len * n:0]u8 {
+    const rep_result = comptime blk: {
+        @setEvalBranchQuota(n * (s.len + 4) + 1000);
+        var buf: [s.len * n:0]u8 = undefined;
+        for (0..n) |i| @memcpy(buf[i * s.len ..][0..s.len], s);
+        const rep_final = buf;
+        break :blk rep_final;
+    };
+    return &rep_result;
 }

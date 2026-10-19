@@ -57,7 +57,7 @@ pub fn resultValid(bytes: []const u8) bool {
 }
 pub fn plan(mode: Mode, facts: Facts, owner: Policy) Program {
     var request: [128]u8 = @splat(0);
-    request[0..4].* = .{ 77, 1, @intFromEnum(mode), @as(u8, @intFromBool(builtin.mode == .Debug or builtin.mode == .ReleaseSafe)) | (@as(u8, @intFromBool(@bitSizeOf(usize) == 32)) << 1) };
+    request[0..4].* = .{ 77, 1, @intFromEnum(mode), @as(u8, @intFromBool(builtin.mode == .debug or builtin.mode == .safe)) | (@as(u8, @intFromBool(@bitSizeOf(usize) == 32)) << 1) };
     var flags: u32 = 0;
     inline for (.{ "requires_render", "view_exists", "software", "packet_service", "representable", "ok", "retained_pixels", "current", "image_upload", "image_index_present" }, 0..) |field, i|
         flags |= @as(u32, @intFromBool(@field(facts, field))) << @intCast(i);

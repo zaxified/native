@@ -67,7 +67,7 @@ fn enumType(comptime family: Family) type {
 comptime {
     // Keep ordinal transport tied to the independently tested native vocabulary.
     for (.{ .view, .titlebar, .backend, .pixel_format, .present_mode, .alpha_mode, .color_space, .feature }, .{ 19, 4, 4, 2, 2, 3, 3, 28 }) |family, count| {
-        if (@typeInfo(enumType(family)).@"enum".fields.len != count) @compileError("update bridge descriptor vocabulary");
+        if (typeFields(@typeInfo(enumType(family)).@"enum").len != count) @compileError("update bridge descriptor vocabulary");
     }
 }
 pub fn choice(policy: Policy, comptime family: Family, value: []const u8) ?enumType(family) {
@@ -80,7 +80,7 @@ pub fn choice(policy: Policy, comptime family: Family, value: []const u8) ?enumT
     const result = plan(policy, bytes[0 .. 96 + count]);
     result.admit() catch @panic("invalid compiled bridge choice");
     const ordinal = result.word(16);
-    if (ordinal > @typeInfo(enumType(family)).@"enum".fields.len) @panic("invalid compiled bridge enum ordinal");
+    if (ordinal > typeFields(@typeInfo(enumType(family)).@"enum").len) @panic("invalid compiled bridge enum ordinal");
     return if (ordinal == 0) null else @enumFromInt(ordinal - 1);
 }
 pub fn viewKindFromString(policy: ?Policy, value: []const u8) ?platform.ViewKind {
@@ -203,4 +203,42 @@ pub fn webViewUrlOrigin(policy: ?Policy, url: []const u8, buffer: []u8) ![]const
         @memcpy(buffer[0..@intCast(end)], url[0..@intCast(end)]);
         return buffer[0..@intCast(end)];
     }
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

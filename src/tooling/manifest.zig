@@ -3910,7 +3910,7 @@ test "font manifests enforce permanent ids, bundled paths and the native slot bo
     const nine = try std.fmt.allocPrint(
         allocator,
         "{{\"id\":\"dev.test.fonts\",\"name\":\"fonts\",\"version\":\"0.1.0\",\"assets\":{{\"fonts\":[{s}]}}}}",
-        .{"{\"id\":64,\"path\":\"assets/a.ttf\"}," ** 8 ++ "{\"id\":65,\"path\":\"assets/b.ttf\"}"},
+        .{strRepeat("{\"id\":64,\"path\":\"assets/a.ttf\"},", 8) ++ "{\"id\":65,\"path\":\"assets/b.ttf\"}"},
     );
     defer allocator.free(nine);
     try std.testing.expectError(error.TooManyFontAssets, parseJsonText(allocator, nine));
@@ -3925,4 +3925,16 @@ test "font manifests enforce permanent ids, bundled paths and the native slot bo
         defer allocator.free(source);
         try std.testing.expectError(case.err, parseJsonText(allocator, source));
     }
+}
+
+/// Comptime string repetition; replaces the `**` operator removed in Zig 0.17.
+inline fn strRepeat(comptime s: []const u8, comptime n: usize) *const [s.len * n:0]u8 {
+    const rep_result = comptime blk: {
+        @setEvalBranchQuota(n * (s.len + 4) + 1000);
+        var buf: [s.len * n:0]u8 = undefined;
+        for (0..n) |i| @memcpy(buf[i * s.len ..][0..s.len], s);
+        const rep_final = buf;
+        break :blk rep_final;
+    };
+    return &rep_result;
 }

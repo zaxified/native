@@ -42,7 +42,7 @@ fn writeValue(list: *std.ArrayList(u8), allocator: std.mem.Allocator, value: any
         .int => {
             try list.append(allocator, 1);
             var bytes: [16]u8 = undefined;
-            const U = std.meta.Int(.unsigned, @bitSizeOf(T));
+            const U = @Int(.unsigned, @bitSizeOf(T));
             std.mem.writeInt(u128, &bytes, @as(U, @bitCast(value)), .little);
             try list.appendSlice(allocator, &bytes);
         },
@@ -67,8 +67,8 @@ fn writeValue(list: *std.ArrayList(u8), allocator: std.mem.Allocator, value: any
         },
         .@"struct" => |s| {
             try list.append(allocator, 6);
-            try writeWord(list, allocator, s.fields.len);
-            inline for (s.fields) |field| try writeValue(list, allocator, @field(value, field.name));
+            try writeWord(list, allocator, typeFields(s).len);
+            inline for (typeFields(s)) |field| try writeValue(list, allocator, @field(value, field.name));
         },
         .array => {
             try list.append(allocator, 6);
@@ -87,7 +87,7 @@ fn writeValue(list: *std.ArrayList(u8), allocator: std.mem.Allocator, value: any
 fn writeNode(list: *std.ArrayList(u8), allocator: std.mem.Allocator, node: events.WidgetLayoutNode) AllocationError!void {
     const w = node.widget;
     const header = list.items.len;
-    try list.appendSlice(allocator, &([_]u8{0} ** node_header_size));
+    try list.appendSlice(allocator, &(@as([node_header_size]u8, @splat(0))));
     std.mem.writeInt(u64, list.items[header..][0..8], w.id, .little);
     const flags: u32 = @intFromBool(node.parent_index == null) | (@as(u32, @intFromBool(w.hasCodeDiff())) << 1) |
         (@as(u32, @intFromBool(w.terminal.grid != null)) << 2) | (@as(u32, @intFromBool(w.semantics.hidden)) << 3);
@@ -106,7 +106,7 @@ fn writeNode(list: *std.ArrayList(u8), allocator: std.mem.Allocator, node: event
         w.static_text_group_offset,
         .{ w.opacity, w.transform },
     };
-    comptime std.debug.assert(@typeInfo(@TypeOf(groups)).@"struct".fields.len == group_count);
+    comptime std.debug.assert(typeFields(@typeInfo(@TypeOf(groups)).@"struct").len == group_count);
     inline for (groups, 0..) |group, i| {
         const start = list.items.len;
         try writeValue(list, allocator, group);
@@ -132,7 +132,7 @@ pub const Plan = struct {
     pub fn init(allocator: std.mem.Allocator, policy: Policy, previous: anytype, next: anytype, previous_root: ?geometry.RectF, next_root: ?geometry.RectF, capacity: usize) AllocationError!Plan {
         var list: std.ArrayList(u8) = .empty;
         defer list.deinit(allocator);
-        try list.appendSlice(allocator, &([_]u8{0} ** 64));
+        try list.appendSlice(allocator, &(@as([64]u8, @splat(0))));
         list.items[0..4].* = .{ 25, 1, 0, 0 };
         put(list.items, 4, count(previous.nodes.len));
         put(list.items, 8, count(next.nodes.len));
@@ -296,3 +296,41 @@ pub const RenderPlan = struct {
         return word(self.result, 32 + self.length * 16 + (i + if (g == 1) self.group_lengths[0] else @as(usize, 0)) * 4);
     }
 };
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
+}

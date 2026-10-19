@@ -565,9 +565,9 @@ const Snapshot = struct {
             .phase = model.phase,
             .items_len = model.items.len,
             .total_items = model.totalItems,
-            .feed_title = [_]u8{0} ** 128,
+            .feed_title = @as([128]u8, @splat(0)),
             .feed_title_len = @min(model.feedTitle.len, 128),
-            .last_link = [_]u8{0} ** 128,
+            .last_link = @as([128]u8, @splat(0)),
             .last_link_len = 0,
         };
         @memcpy(self.feed_title[0..self.feed_title_len], model.feedTitle[0..self.feed_title_len]);
@@ -2437,7 +2437,7 @@ test "compiled retained reducer preserves undo redo across shared storage budget
         try Fixture.key(harness, application, "z", "", true, false);
         var retained = try harness.runtime.canvasWidgetLayout(1, "canvas");
         try std.testing.expectEqual(filler.len, retained.findById(2).?.widget.text.len);
-        const blocker = [_]u8{'c'} ** 505;
+        const blocker = @as([505]u8, @splat('c'));
         const blocking_text = canvas.Widget{ .id = 3, .kind = .text, .frame = geometry.RectF.init(12, 112, 180, 24), .text = &blocker };
         var blocked_nodes: [3]canvas.WidgetLayoutNode = undefined;
         const blocked = try canvas.layoutWidgetTree(.{ .id = 1, .kind = .stack, .children = &.{ textarea, blocking_text } }, geometry.RectF.init(0, 0, 260, 160), &blocked_nodes);
@@ -2454,7 +2454,7 @@ test "compiled retained reducer preserves undo redo across shared storage budget
         const restored = retained.findById(2).?.widget.text;
         try std.testing.expectEqual(filler.len + 1, restored.len);
         try std.testing.expect(std.mem.indexOfScalar(u8, restored, '!') != null);
-        const burst = [_]u8{'b'} ** 510;
+        const burst = @as([510]u8, @splat('b'));
         try Fixture.key(harness, application, "b", &burst, false, false);
         retained = try harness.runtime.canvasWidgetLayout(1, "canvas");
         try std.testing.expectEqual(filler.len + 1, retained.findById(2).?.widget.text.len);
@@ -4305,7 +4305,7 @@ test "compiled delay plans preserve first match empty keys rounding routes and c
     const command_copy = try std.testing.allocator.dupe(u8, borrowed_command);
     defer std.testing.allocator.free(command_copy);
     // A live policy allocates without revoking an outstanding command borrow.
-    const first = [_]u8{ 4, 0, 1, 0 } ++ ([_]u8{255} ** 16);
+    const first = [_]u8{ 4, 0, 1, 0 } ++ (@as([16]u8, @splat(255)));
     var first_result: [2]u8 = undefined;
     try std.testing.expectEqual(first_result.len, core.nativeTimerPolicy(&first, &first_result));
     try std.testing.expectEqualSlices(u8, command_copy, borrowed_command);
@@ -4349,7 +4349,7 @@ test "compiled delay plans preserve first match empty keys rounding routes and c
                     var lookup: [1]u8 = undefined;
                     try std.testing.expectEqual(lookup.len, core.nativeTimerPolicy(request[0 .. at - 10], &lookup));
                     try std.testing.expectEqual(if (matching) |i| @as(u8, @intCast(i)) else @as(u8, 255), lookup[0]);
-                    const fire = [_]u8{ 4, @intCast(slot), 0xff, 0xff } ++ ([_]u8{tag} ** 16);
+                    const fire = [_]u8{ 4, @intCast(slot), 0xff, 0xff } ++ (@as([16]u8, @splat(tag)));
                     var route: [2]u8 = undefined;
                     try std.testing.expectEqual(route.len, core.nativeTimerPolicy(&fire, &route));
                     core.rt.frameReset();
@@ -4384,7 +4384,7 @@ test "compiled delay plans preserve first match empty keys rounding routes and c
 }
 
 test "compiled delay admission drops an incumbent stream even with a full table" {
-    var request = [_]u8{ 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 1 } ++ ([_]u8{ 1, 0, 0 } ** 16);
+    var request = [_]u8{ 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 1 } ++ (arrRepeat(u8, &.{ 1, 0, 0 }, 16));
     std.mem.writeInt(u64, request[2..10], @bitCast(@as(f64, 700.5)), .little);
     var output: [10]u8 = undefined;
     try std.testing.expectEqual(output.len, core.nativeTimerPolicy(&request, &output));
@@ -4393,7 +4393,7 @@ test "compiled delay admission drops an incumbent stream even with a full table"
 }
 
 test "compiled database plans preserve first matching keys exact fingerprints retention and ABI ownership" {
-    const longest = [_]u8{255} ** 255;
+    const longest = @as([255]u8, @splat(255));
     const names = [_][]const u8{ "query", "caf\xc3\xa9", "\x00\xff", &longest, "absent" };
     var request: [4608]u8 = undefined;
     var lookup: [4608]u8 = undefined;
@@ -4482,7 +4482,7 @@ test "compiled database plans preserve first matching keys exact fingerprints re
 }
 
 test "compiled named effect plans preserve drop occupancy slot order routes and copied cycle ownership" {
-    const longest = [_]u8{255} ** 255;
+    const longest = @as([255]u8, @splat(255));
     const names = [_][]const u8{ "", "read", "caf\xc3\xa9", "\x00\xff", &longest, "absent" };
     var request: [4608]u8 = undefined;
     var lookup: [4608]u8 = undefined;
@@ -4618,7 +4618,7 @@ test "compiled stream plans preserve admission routes loss and dispatch arena ow
         try std.testing.expectEqualSlices(u8, &.{ tag, 0, @intFromBool(damage), 0, 0 }, &line);
         comparisons += 3;
     };
-    const long_key = [_]u8{255} ** 255;
+    const long_key = @as([255]u8, @splat(255));
     const names = [_][]const u8{ "", "source", "caf\xc3\xa9", "\x00\xff", &long_key };
     var request: [4400]u8 = undefined;
     for (0..17) |occupied| for (names) |name| for ([_]u8{ 0, 1 }) |fetch| for ([_]u8{ 0, 1 }) |file| for ([_]u8{ 0, 1 }) |effect| {
@@ -4676,8 +4676,8 @@ test "compiled window decisions preserve labels admission order retirement and A
     const borrowed_command = core.bootCommand();
     const command_copy = try std.testing.allocator.dupe(u8, borrowed_command);
     defer std.testing.allocator.free(command_copy);
-    const names = [_][]const u8{ "", "new", "other", "caf\xc3\xa9", "\x00\xff", &([_]u8{255} ** 64), &([_]u8{255} ** 65) };
-    const canvases = [_][]const u8{ "", "main", "fresh", "occupied", "\x00\xff", &([_]u8{255} ** 64), &([_]u8{255} ** 65) };
+    const names = [_][]const u8{ "", "new", "other", "caf\xc3\xa9", "\x00\xff", &(@as([64]u8, @splat(255))), &(@as([65]u8, @splat(255))) };
+    const canvases = [_][]const u8{ "", "main", "fresh", "occupied", "\x00\xff", &(@as([64]u8, @splat(255))), &(@as([65]u8, @splat(255))) };
     var comparisons: usize = 0;
     for (0..5) |count| {
         for (names) |name| for (canvases) |candidate_canvas| {
@@ -4919,7 +4919,7 @@ const HoldTimerCapabilities = struct {
     var original: native_sdk.platform.PlatformServices = undefined;
     var fail_start = false;
     var fail_cancel = false;
-    var calls = [_]usize{0} ** 2;
+    var calls = @as([2]usize, @splat(0));
     fn start(_: ?*anyopaque, id: u64, interval: u64, repeats: bool) anyerror!void {
         calls[0] += 1;
         if (fail_start) return error.StartFailed;
@@ -5108,7 +5108,7 @@ fn statusParityItems(model: *const StatusParityModel, scratch: *StatusParityApp.
 }
 const StatusParityService = struct {
     var original: native_sdk.platform.PlatformServices = undefined;
-    var counts = [_]usize{0} ** 5;
+    var counts = @as([5]usize, @splat(0));
     var create_fails: bool = false;
     var remove_fails: bool = false;
     var patch_fails: bool = false;
@@ -8851,7 +8851,7 @@ test "compiled drag protocol preserves float slop, every continuation and borrow
     const original = try std.testing.allocator.dupe(u8, borrowed);
     defer std.testing.allocator.free(original);
     var first: [1]u8 = undefined;
-    var request = [_]u8{0} ** 16;
+    var request = @as([16]u8, @splat(0));
     request[0] = 35;
     try std.testing.expectEqual(@as(usize, 1), core.nativeSurfaceScopePolicy(&request, &first));
     const values = [_]f32{ 0, 5.9999995, 6, -6, 6.0000005, -5.9999995, std.math.inf(f32), -std.math.inf(f32), std.math.nan(f32) };
@@ -9516,7 +9516,7 @@ test "compiled media lifecycle preserves numeric boundaries native capacities co
 
 test "compiled media transport preserves complete actions exact key bytes ownership and all scalar boundaries" {
     var request: [15 + 64 * 2]u8 = @splat(0);
-    const long = [_]u8{255} ** 64;
+    const long = @as([64]u8, @splat(255));
     const keys = [_][]const u8{ "", "clip", "\x00\xff", &long };
     const scalars = [_]f64{ std.math.nan(f64), -std.math.inf(f64), std.math.inf(f64), -1, -0.0, 0, 0.5, 1.5, 9007199254740991, 9007199254740992, 9007199254740994, std.math.floatMax(f64) };
     var comparisons: usize = 0;
@@ -9757,7 +9757,7 @@ fn requestCoordinationPacket(buffer: []u8, name: []const u8, used: usize, stored
 
 test "compiled request complete admission lookup result retirement and opaque channel ownership" {
     var buffer: [10000]u8 = undefined;
-    const long = [_]u8{255} ** 255;
+    const long = @as([255]u8, @splat(255));
     const keys = [_][]const u8{ "", "route", "\x00\xff", &long };
     var comparisons: usize = 0;
     for (keys) |name| for (keys) |stored| for (0..37) |used| for (0..3) |pool| {
@@ -9818,7 +9818,7 @@ test "compiled request complete admission lookup result retirement and opaque ch
 test "compiled request cancellation keeps family priority dropped routes live DB and file sink semantics" {
     var buffer: [32000]u8 = undefined;
     const counts = [_]usize{ 36, 16, 16, 16, 4, 16, 16 };
-    const long = [_]u8{255} ** 255;
+    const long = @as([255]u8, @splat(255));
     const keys = [_][]const u8{ "", "route", "\x00\xff", &long };
     var comparisons: usize = 0;
     for (keys) |name| for (0..7) |selected_family| for (0..counts[selected_family]) |owner| for (0..if (selected_family == 6) @as(usize, 4) else if (selected_family == 0 or selected_family == 1 or selected_family == 4) 2 else 1) |flags| for (0..2) |duplicate| {
@@ -9867,7 +9867,7 @@ test "compiled request credentials reject malformed records and copy only borrow
 
 test "compiled request DB commands preserve complete page done exec errors and subscription routes" {
     var buffer: [4500]u8 = undefined;
-    const long = [_]u8{255} ** 255;
+    const long = @as([255]u8, @splat(255));
     const keys = [_][]const u8{ "", "query", "\x00\xff", &long };
     var comparisons: usize = 0;
     for (keys) |name| for (keys) |stored| for (0..17) |used| for (0..4) |flags| {
@@ -9932,7 +9932,7 @@ fn fileCoordinationPacket(buffer: []u8, name: []const u8, stored: []const u8, ma
 
 test "compiled file coordination preserves read replacement sink ordering every completion and owned plans" {
     var buffer: [1600]u8 = undefined;
-    const long = [_]u8{255} ** 255;
+    const long = @as([255]u8, @splat(255));
     const names = [_][]const u8{ "", "read", "\x00\xff", &long };
     var comparisons: usize = 0;
     for (names) |name| for (names) |stored| for (0..16) |mask| for (0..8) |flags| {
@@ -9970,7 +9970,7 @@ test "compiled file coordination preserves read replacement sink ordering every 
 
 test "compiled file coordination clipboard complete routes capacity collisions and anonymous ownership" {
     var buffer: [4400]u8 = undefined;
-    const long = [_]u8{255} ** 255;
+    const long = @as([255]u8, @splat(255));
     const names = [_][]const u8{ "", "copy", "\x00\xff", &long };
     var comparisons: usize = 0;
     for (names) |name| for (names) |stored| for (0..17) |used| for (0..2) |blocked| {
@@ -10252,4 +10252,12 @@ test "compiled journal codec borrows caller payloads without collecting the app 
         try std.testing.expectEqualStrings("\xffsecond", decoded.files_dropped.paths[1]);
     }
     core.rt.frameReset();
+}
+
+/// Comptime array repetition; replaces the `**` operator removed in Zig 0.17.
+fn arrRepeat(comptime T: type, comptime unit: []const T, comptime n: usize) [unit.len * n]T {
+    @setEvalBranchQuota(n * (unit.len + 4) + 1000);
+    var buf: [unit.len * n]T = undefined;
+    for (0..n) |i| @memcpy(buf[i * unit.len ..][0..unit.len], unit);
+    return buf;
 }

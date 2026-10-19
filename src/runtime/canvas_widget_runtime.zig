@@ -1081,9 +1081,10 @@ pub fn canvasWidgetLayoutTreeWithRuntimeReconcileState(
     const staged_nodes = node_buffer[0..next.nodes.len];
     @memcpy(staged_nodes, next.nodes);
     const staged_root_bounds = next.root_bounds orelse if (staged_nodes.len > 0) staged_nodes[0].frame else geometry.RectF.init(0, 0, 0, 0);
-    var strata_scratch = std.heap.stackFallback(2048, std.heap.page_allocator);
+    var strata_scratch_buf: [2048]u8 = undefined;
+    var strata_scratch = std.heap.BufferFirstAllocator.init(&strata_scratch_buf, std.heap.page_allocator);
     const strata = if (tokens.layout_coordination_policy) |policy|
-        canvas.layout_coordination_policy.RetainedPlan.init(strata_scratch.get(), policy, staged_nodes) catch @panic("reconcile strata allocation failed")
+        canvas.layout_coordination_policy.RetainedPlan.init(strata_scratch.allocator(), policy, staged_nodes) catch @panic("reconcile strata allocation failed")
     else
         null;
     defer if (strata) |plan| plan.deinit();

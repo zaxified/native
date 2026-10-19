@@ -1067,7 +1067,7 @@ fn referenceMemoHashValue(hasher: *std.hash.Wyhash, value: anytype) void {
     const T = @TypeOf(value);
     switch (@typeInfo(T)) {
         .float => {
-            const Bits = std.meta.Int(.unsigned, @bitSizeOf(T));
+            const Bits = @Int(.unsigned, @bitSizeOf(T));
             const bits: Bits = @bitCast(value);
             hasher.update(std.mem.asBytes(&bits));
         },
@@ -1083,7 +1083,7 @@ fn referenceMemoHashValue(hasher: *std.hash.Wyhash, value: anytype) void {
             }
         },
         .@"struct" => |info| {
-            inline for (info.fields) |field| referenceMemoHashValue(hasher, @field(value, field.name));
+            inline for (typeFields(info)) |field| referenceMemoHashValue(hasher, @field(value, field.name));
         },
         .@"union" => {
             switch (value) {
@@ -1752,4 +1752,42 @@ fn colorChannelToByte(value: f32) u8 {
 }
 fn nonNegative(value: f32) f32 {
     return @max(0, value);
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

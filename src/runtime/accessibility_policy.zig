@@ -9,7 +9,7 @@ pub const Publication = enum { unchanged, deferred, publish };
 const roles = [_]canvas.WidgetRole{ .none, .group, .text, .link, .image, .button, .textbox, .tooltip, .dialog, .menu, .menuitem, .list, .listitem, .row, .grid, .gridcell, .tab, .checkbox, .radio, .radiogroup, .switch_control, .slider, .progressbar, .chart, .tree, .treeitem, .separator };
 const states = [_][]const u8{ "hovered", "pressed", "focused", "disabled", "selected", "required", "read_only", "invalid" };
 comptime {
-    if (roles.len != @typeInfo(canvas.WidgetRole).@"enum".fields.len or platform.max_widget_accessibility_nodes != 64) @compileError("update accessibility packet limits");
+    if (roles.len != typeFields(@typeInfo(canvas.WidgetRole).@"enum").len or platform.max_widget_accessibility_nodes != 64) @compileError("update accessibility packet limits");
 }
 fn roleCode(role: canvas.WidgetRole) u32 {
     for (roles, 0..) |candidate, i| if (role == candidate) return @intCast(i);
@@ -69,7 +69,7 @@ pub fn project(allocator: std.mem.Allocator, policy: Policy, semantics: []const 
         word(request, at + 20, flags);
         word(request, at + 24, @bitCast(node.value orelse @as(f32, 0)));
         var actions: u32 = 0;
-        inline for (@typeInfo(platform.WidgetAccessibilityActions).@"struct".fields, 0..) |field, bit| if (@field(node.actions, field.name)) {
+        inline for (typeFields(@typeInfo(platform.WidgetAccessibilityActions).@"struct"), 0..) |field, bit| if (@field(node.actions, field.name)) {
             actions |= @as(u32, 1) << @intCast(bit);
         };
         word(request, at + 28, actions);
@@ -116,7 +116,45 @@ pub fn project(allocator: std.mem.Allocator, policy: Policy, semantics: []const 
             .expanded = if (flags & 256 != 0) flags & 512 != 0 else null,
             .focusable = flags & 1024 != 0,
         };
-        inline for (@typeInfo(platform.WidgetAccessibilityActions).@"struct".fields, 0..) |field, bit| @field(target.actions, field.name) = actions & (@as(u32, 1) << @intCast(bit)) != 0;
+        inline for (typeFields(@typeInfo(platform.WidgetAccessibilityActions).@"struct"), 0..) |field, bit| @field(target.actions, field.name) = actions & (@as(u32, 1) << @intCast(bit)) != 0;
     }
     return output[0..count];
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }

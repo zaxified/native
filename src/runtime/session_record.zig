@@ -78,8 +78,8 @@ pub const SessionRecorder = struct {
     /// journal's WHOLE representation of the interaction (see
     /// `stageEvent`).
     suppress_owner_depth: ?usize = null,
-    staged_lens: [journal.max_session_event_depth]usize = [_]usize{0} ** journal.max_session_event_depth,
-    staged_suppressed: [journal.max_session_event_depth]bool = [_]bool{false} ** journal.max_session_event_depth,
+    staged_lens: [journal.max_session_event_depth]usize = @as([journal.max_session_event_depth]usize, @splat(0)),
+    staged_suppressed: [journal.max_session_event_depth]bool = @as([journal.max_session_event_depth]bool, @splat(false)),
     staged: [journal.max_session_event_depth][journal.max_session_event_bytes]u8 = undefined,
     staged_chrome_counts: [journal.max_session_event_depth]usize = @splat(0),
     staged_chrome: [journal.max_session_event_depth][journal.max_session_window_chrome_queries]journal.WindowChromeRecord = undefined,

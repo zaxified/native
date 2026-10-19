@@ -29,7 +29,7 @@ const Card = struct {
     id: u32,
     done: bool = false,
     weight: f32 = 1,
-    label_storage: [16]u8 = [_]u8{0} ** 16,
+    label_storage: [16]u8 = @as([16]u8, @splat(0)),
     label_len: usize = 0,
 
     pub fn label(card: *const Card) []const u8 {
@@ -1296,7 +1296,7 @@ test "describe traverses *const record fields and pointer-item lists like the en
 
 test "the reflect tag vocabulary never drifts from canvas.TextInputEvent" {
     const reflect = @import("ui_markup_reflect.zig");
-    const event_fields = @typeInfo(canvas.TextInputEvent).@"union".fields;
+    const event_fields = typeFields(@typeInfo(canvas.TextInputEvent).@"union");
     try testing.expectEqual(reflect.text_input_event_tags.len, event_fields.len);
     inline for (event_fields) |field| {
         var found = false;
@@ -1305,7 +1305,7 @@ test "the reflect tag vocabulary never drifts from canvas.TextInputEvent" {
         }
         try testing.expect(found);
     }
-    const direction_fields = @typeInfo(canvas.TextCaretDirection).@"enum".fields;
+    const direction_fields = typeFields(@typeInfo(canvas.TextCaretDirection).@"enum");
     try testing.expectEqual(reflect.text_caret_direction_members.len, direction_fields.len);
     inline for (direction_fields) |field| {
         var found = false;
@@ -1318,7 +1318,7 @@ test "the reflect tag vocabulary never drifts from canvas.TextInputEvent" {
 
 test "the reflect field vocabulary never drifts from canvas.ScrollState" {
     const reflect = @import("ui_markup_reflect.zig");
-    const state_fields = @typeInfo(canvas.ScrollState).@"struct".fields;
+    const state_fields = typeFields(@typeInfo(canvas.ScrollState).@"struct");
     try testing.expectEqual(reflect.scroll_state_field_names.len, state_fields.len);
     inline for (state_fields) |field| {
         // Every real field appears in the pinned vocabulary, and every
@@ -1391,4 +1391,42 @@ test "direct virtual contract checks reject repeated attributes before scope loo
             try testing.expectEqualStrings("view.native", info.path);
         }
     }
+}
+
+// Zig 0.17: @typeInfo is struct-of-arrays; rebuild the old per-field record.
+const TypeField = struct {
+    name: [:0]const u8,
+    type: type,
+    value: comptime_int,
+    default_value_ptr: ?*const anyopaque,
+    is_comptime: bool,
+    alignment: comptime_int,
+};
+
+inline fn typeFields(comptime info: anytype) []const TypeField {
+    const result = comptime blk: {
+        var out: [info.field_names.len]TypeField = undefined;
+        for (info.field_names, 0..) |n, i| {
+            out[i] = .{
+                .name = n,
+                .type = if (@hasField(@TypeOf(info), "field_types")) info.field_types[i] else void,
+                .value = if (@hasField(@TypeOf(info), "field_values")) info.field_values[i] else 0,
+                .default_value_ptr = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "default_value_ptr")) info.field_attrs[i].default_value_ptr else null,
+                .is_comptime = if (@hasField(@TypeOf(info), "field_attrs") and @hasField(@TypeOf(info.field_attrs[i]), "comptime")) info.field_attrs[i].@"comptime" else false,
+                .alignment = if (@hasField(@TypeOf(info), "field_attrs")) (info.field_attrs[i].@"align" orelse 0) else 0,
+            };
+        }
+        const final = out;
+        break :blk final;
+    };
+    return &result;
+}
+
+inline fn typeFieldsOf(comptime T: type) []const TypeField {
+    return switch (@typeInfo(T)) {
+        .@"struct" => |i| typeFields(i),
+        .@"enum" => |i| typeFields(i),
+        .@"union" => |i| typeFields(i),
+        else => @compileError("typeFieldsOf: no fields"),
+    };
 }
